@@ -1,0 +1,25 @@
+import AppKit
+import SwiftUI
+
+/// 用 NSWindow + NSHostingController 承载 SwiftUI 设置界面（R-016/R-017）。
+@MainActor
+final class SettingsWindowController {
+    private var controller: NSWindowController?
+
+    init(settingsModel: SettingsModel) {
+        let hosting = NSHostingController(rootView: SettingsView(model: settingsModel))
+        let window = NSWindow(contentViewController: hosting)
+        window.title = "Status 设置"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 480, height: 360))
+        window.center()
+        controller = NSWindowController(window: window)
+    }
+
+    func show() {
+        controller?.showWindow(nil)
+        controller?.window?.makeKeyAndOrderFront(nil)
+        NSApp?.activate()
+    }
+}
