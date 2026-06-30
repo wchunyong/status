@@ -2,9 +2,9 @@ import AppKit
 import StatusCore
 import SwiftUI
 
-/// 管理状态栏项（两行式）+ 下拉浮窗。@MainActor（B8）。
-/// 状态栏用自定义 `StatusBarItemView`（图4 两行样式，R-014 修订）；
-/// 浮窗用 `NSPopover` + SwiftUI 详情（R-018，D4）。
+/// 管理状态栏项（三模块两行）+ 下拉浮窗。@MainActor（B8）。
+/// 状态栏：`StatusBarItemView`（NSHostingView 装 SwiftUI 内容，图5 样式，R-014 修订）。
+/// 浮窗：`NSPopover` + SwiftUI 详情（R-018，D4）。两者都绑定 MonitorModel，随 1s 采样自动刷新。
 @MainActor
 final class StatusBarManager: NSObject {
     var onOpenSettings: (() -> Void)?
@@ -12,7 +12,7 @@ final class StatusBarManager: NSObject {
 
     private let statusItem: NSStatusItem
     private let popover: NSPopover
-    private let itemView: StatusBarItemView
+    private let statusBarView: StatusBarItemView
     private let settingsModel: SettingsModel
     private let monitorModel: MonitorModel
 
@@ -21,21 +21,15 @@ final class StatusBarManager: NSObject {
         self.monitorModel = monitorModel
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
-        itemView = StatusBarItemView(settingsModel: settingsModel)
+        statusBarView = StatusBarItemView(monitor: monitorModel, settings: settingsModel)
         super.init()
 
         popover.behavior = .transient
         popover.animates = true
 
+        statusBarView.setOnClick { [weak self] in self?.togglePopover() }
         // NSStatusItem.view 已弃用（10.14+），但自定义多行布局仍需它；macOS 14/26 可用。
-        statusItem.view = itemView
-        itemView.onClick = { [weak self] in self?.togglePopover() }
-    }
-
-    // MARK: Sample 驱动
-
-    func update(with sample: Sample) {
-        itemView.update(sample: sample)
+        statusItem.view = statusBarView
     }
 
     // MARK: 浮窗
@@ -55,6 +49,6 @@ final class StatusBarManager: NSObject {
             onQuit: { [weak self] in self?.onQuit?() }
         )
         popover.contentViewController = NSHostingController(rootView: panel)
-        popover.show(relativeTo: itemView.bounds, of: itemView, preferredEdge: .minY)
+        popover.show(relativeTo: statusBarView.bounds, of: statusBarView, preferredEdge: .minY)
     }
 }

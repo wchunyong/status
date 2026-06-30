@@ -18,13 +18,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         bar.onQuit = { NSApplication.shared.terminate(nil) }
         statusBar = bar
 
-        // 采样调度：后台采集，主线程刷新 UI（B8）；写入 monitorModel 供浮窗 1s 自动刷新
+        // 采样调度：后台采集，写入 monitorModel（B8）；状态栏与浮窗都绑定它，随 1s 自动刷新
         let interval = settingsModel.value.refreshIntervalSeconds
         let model = monitorModel
-        let sampler = Sampler(interval: interval, monitor: monitor) { [weak bar, weak model] sample in
+        let sampler = Sampler(interval: interval, monitor: monitor) { [weak model] sample in
             Task { @MainActor in
                 model?.sample = sample
-                bar?.update(with: sample)
             }
         }
         sampler.start()
