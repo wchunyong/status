@@ -1,12 +1,11 @@
 import StatusCore
 import SwiftUI
 
-/// 状态栏项内容（图5 三模块两行样式，设计系统 v3）。
+/// 状态栏项内容（图5 三模块两行样式，设计系统 v4）。
 ///
-/// 设计轴：所有数字统一 **SF Rounded + 等宽 tabular**（一致性是好看的基础）。
-/// 层次：% 用 12pt bold（主角）/ 网络速率 10pt semibold（配角）。
-/// 标签：8pt semibold 大写 + tracking（精致）。箭头 SF Symbol，下载蓝色强调。
-/// 左：网络（↑上传在上 / ↓下载在下）；中：内存；右：CPU。绑定 MonitorModel 自动刷新。
+/// 用户偏好：小、方体（默认 SF Pro，非圆体）、无彩色、保留文字标签。
+/// 字阶：% 10pt semibold（主角）/ 网络速率 9pt medium（配角）/ 标签 7pt medium 大写+tracking。
+/// 全单色（数字 primary，箭头与标签 secondary）。等宽 tabular 防抖。
 struct StatusBarItemContent: View {
     @ObservedObject var monitor: MonitorModel
     @ObservedObject var settings: SettingsModel
@@ -22,7 +21,7 @@ struct StatusBarItemContent: View {
 
     var body: some View {
         Button(action: onClick) {
-            HStack(alignment: .center, spacing: 14) {
+            HStack(alignment: .center, spacing: 12) {
                 ForEach(visibleItems, id: \.self) { item in
                     module(for: item)
                 }
@@ -41,8 +40,8 @@ struct StatusBarItemContent: View {
         switch item {
         case .network:
             VStack(alignment: .leading, spacing: 1) {
-                rateRow(symbol: "arrow.up", tint: .secondary, bps: sample?.networkRate.bytesPerSecondOut ?? 0)
-                rateRow(symbol: "arrow.down", tint: .blue, bps: sample?.networkRate.bytesPerSecondIn ?? 0)
+                rateRow(symbol: "arrow.up", bps: sample?.networkRate.bytesPerSecondOut ?? 0)
+                rateRow(symbol: "arrow.down", bps: sample?.networkRate.bytesPerSecondIn ?? 0)
             }
         case .memory:
             percentModule(sample?.memory.usedFraction ?? 0, label: "MEM")
@@ -51,13 +50,13 @@ struct StatusBarItemContent: View {
         }
     }
 
-    private func rateRow(symbol: String, tint: Color, bps: Double) -> some View {
+    private func rateRow(symbol: String, bps: Double) -> some View {
         HStack(alignment: .center, spacing: 3) {
             Image(systemName: symbol)
-                .font(.system(size: 8, weight: .semibold))
-                .foregroundStyle(tint)
+                .font(.system(size: 7, weight: .semibold))
+                .foregroundStyle(.secondary)
             Text(ByteRateFormatter(unit: s.networkUnit).format(bytesPerSecond: bps))
-                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                .font(.system(size: 9, weight: .medium))
                 .monospacedDigit()
         }
     }
@@ -65,10 +64,10 @@ struct StatusBarItemContent: View {
     private func percentModule(_ fraction: Double, label: String) -> some View {
         VStack(spacing: 1) {
             Text("\(Int((fraction * 100).rounded()))%")
-                .font(.system(size: 12, weight: .bold, design: .rounded))
+                .font(.system(size: 10, weight: .semibold))
                 .monospacedDigit()
             Text(label)
-                .font(.system(size: 8, weight: .semibold))
+                .font(.system(size: 7, weight: .medium))
                 .tracking(0.6)
                 .foregroundStyle(.secondary)
         }
