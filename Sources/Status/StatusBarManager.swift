@@ -2,8 +2,9 @@ import AppKit
 import StatusCore
 import SwiftUI
 
-/// 管理状态栏项 + 下拉浮窗。@MainActor（B8）。
-/// 状态栏用 `attributedTitle` 渲染（R-014）；浮窗用 `NSPopover` + SwiftUI 详情（R-018 修订，D4）。
+/// 管理状态栏项（两行式）+ 下拉浮窗。@MainActor（B8）。
+/// 状态栏用自定义 `StatusBarItemView`（图4 两行样式，R-014 修订）；
+/// 浮窗用 `NSPopover` + SwiftUI 详情（R-018，D4）。
 @MainActor
 final class StatusBarManager: NSObject {
     var onOpenSettings: (() -> Void)?
@@ -11,6 +12,7 @@ final class StatusBarManager: NSObject {
 
     private let statusItem: NSStatusItem
     private let popover: NSPopover
+    private let itemView: StatusBarItemView
     private let settingsModel: SettingsModel
     private let monitorModel: MonitorModel
 
@@ -19,59 +21,26 @@ final class StatusBarManager: NSObject {
         self.monitorModel = monitorModel
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         popover = NSPopover()
+        itemView = StatusBarItemView(settingsModel: settingsModel)
         super.init()
 
         popover.behavior = .transient
         popover.animates = true
 
-        if let button = statusItem.button {
-            button.image = nil
-            button.attributedTitle = Self.render("Status")
-            button.action = #selector(togglePopover)
-            button.target = self
-        }
+        // NSStatusItem.view 已弃用（10.14+），但自定义多行布局仍需它；macOS 14/26 可用。
+        statusItem.view = itemView
+        itemView.onClick = { [weak self] in self?.togglePopover() }
     }
 
     // MARK: Sample 驱动
 
     func update(with sample: Sample) {
-        statusItem.button?.attributedTitle = Self.render(composeStatusText(sample: sample))
-    }
-
-    // MARK: 状态栏文本
-
-    private func composeStatusText(sample: Sample) -> String {
-        let s = settingsModel.value
-        var parts: [String] = []
-        for item in s.itemOrder where s.isVisible(item) {
-            switch item {
-            case .network:
-                let f = ByteRateFormatter(unit: s.networkUnit)
-                let down = f.format(bytesPerSecond: sample.networkRate.bytesPerSecondIn)
-                let up = f.format(bytesPerSecond: sample.networkRate.bytesPerSecondOut)
-                parts.append(s.showNetworkArrows ? "↓\(down) ↑\(up)" : "\(down) \(up)")
-            case .memory:
-                let f = MemoryDisplayFormatter(format: s.memoryFormat, unit: s.memoryUnit)
-                parts.append(f.string(for: sample.memory))
-            case .cpu:
-                parts.append(PercentFormatter().format(fraction: sample.cpuFraction))
-            }
-        }
-        let sep = s.compactMode ? "  " : " · "
-        return parts.isEmpty ? "Status" : parts.joined(separator: sep)
-    }
-
-    private static func render(_ text: String) -> NSAttributedString {
-        NSAttributedString(string: text, attributes: [
-            .font: NSFont.monospacedDigitSystemFont(ofSize: 11, weight: .regular),
-            .foregroundColor: NSColor.labelColor,
-        ])
+        itemView.update(sample: sample)
     }
 
     // MARK: 浮窗
 
-    @objc private func togglePopover() {
-        guard let button = statusItem.button else { return }
+    private func togglePopover() {
         if popover.isShown {
             popover.performClose(nil)
             return
@@ -83,11 +52,9 @@ final class StatusBarManager: NSObject {
                 self?.popover.performClose(nil)
                 self?.onOpenSettings?()
             },
-            onQuit: { [weak self] in
-                self?.onQuit?()
-            }
+            onQuit: { [weak self] in self?.onQuit?() }
         )
         popover.contentViewController = NSHostingController(rootView: panel)
-        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
+        popover.show(relativeTo: itemView.bounds, of: itemView, preferredEdge: .minY)
     }
 }
