@@ -6,7 +6,7 @@ final class FormatterTests: XCTestCase {
 
     func testByteRateAutoMB() {
         let f = ByteRateFormatter(unit: .auto)
-        XCTAssertEqual(f.format(bytesPerSecond: 5.5 * 1024 * 1024), "5.50 MB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 5.5 * 1024 * 1024), "5.5 MB/s")
     }
 
     func testByteRateAutoKB() {
@@ -17,15 +17,15 @@ final class FormatterTests: XCTestCase {
     func testByteRateAutoBoundary() {
         // 恰好 1 MB/s 边界 → 走 MB
         let f = ByteRateFormatter(unit: .auto)
-        XCTAssertEqual(f.format(bytesPerSecond: 1024.0 * 1024.0), "1.00 MB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 1024.0 * 1024.0), "1 MB/s")
     }
 
     func testByteRateFixedKB() {
-        XCTAssertEqual(ByteRateFormatter(unit: .kbs).format(bytesPerSecond: 2048), "2.00 KB/s")
+        XCTAssertEqual(ByteRateFormatter(unit: .kbs).format(bytesPerSecond: 2048), "2 KB/s")
     }
 
     func testByteRateMbps() {
-        XCTAssertEqual(ByteRateFormatter(unit: .mbps).format(bytesPerSecond: 125_000), "1.00 Mbps")
+        XCTAssertEqual(ByteRateFormatter(unit: .mbps).format(bytesPerSecond: 125_000), "1 Mbps")
     }
 
     // MARK: ByteFormatter

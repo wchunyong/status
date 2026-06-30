@@ -48,17 +48,23 @@ public struct ByteRateFormatter: Sendable {
             return bps >= 1024.0 * 1024.0 ? fixedMB(bps) : fixedKB(bps)
         case .kbs: return fixedKB(bps)
         case .mbs: return fixedMB(bps)
-        case .kbps: return "\(String(format: "%.2f", bps * 8 / 1000)) Kbps"
-        case .mbps: return "\(String(format: "%.2f", bps * 8 / 1_000_000)) Mbps"
+        case .kbps: return "\(Self.trim(bps * 8 / 1000)) Kbps"
+        case .mbps: return "\(Self.trim(bps * 8 / 1_000_000)) Mbps"
         }
     }
 
     private func fixedKB(_ bps: Double) -> String {
-        "\(String(format: "%.2f", bps / 1024)) KB/s"
+        "\(Self.trim(bps / 1024)) KB/s"
     }
 
     private func fixedMB(_ bps: Double) -> String {
-        "\(String(format: "%.2f", bps / (1024 * 1024))) MB/s"
+        "\(Self.trim(bps / (1024 * 1024))) MB/s"
+    }
+
+    /// 去掉多余尾零：5.50→5.5、2.00→2、0.32→0.32（不变）。
+    private static func trim(_ value: Double) -> String {
+        let formatted = String(format: "%.2f", value)
+        return formatted.replacingOccurrences(of: #"\.?0+$"#, with: "", options: .regularExpression)
     }
 }
 
