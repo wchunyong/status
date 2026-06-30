@@ -34,10 +34,15 @@ final class StatusBarItemView: NSView {
 
     private func applySizing() {
         let fit = hostingView.fittingSize
-        // 高度按内容自然撑开（刘海机菜单栏更高，容得下大字）；仅设下限避免过扁。
-        let size = NSSize(width: fit.width + 4, height: max(fit.height, 18))
+        let statusBarHeight = NSStatusBar.system.thickness
+        let size = NSSize(width: fit.width + 4, height: max(statusBarHeight, fit.height))
         setFrameSize(size)
-        hostingView.frame = NSRect(origin: .zero, size: size)
+
+        let origin = NSPoint(
+            x: 0,
+            y: max(0, floor((size.height - fit.height) / 2))
+        )
+        hostingView.frame = NSRect(origin: origin, size: NSSize(width: size.width, height: fit.height))
     }
 
     override func mouseDown(with _: NSEvent) {

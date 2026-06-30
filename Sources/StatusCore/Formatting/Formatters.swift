@@ -68,6 +68,49 @@ public struct ByteRateFormatter: Sendable {
     }
 }
 
+/// 状态栏专用网络速率格式化：固定三列数值，避免实时刷新时宽度抖动。
+public struct StatusBarByteRateFormatter: Sendable {
+    public let unit: NetworkSpeedUnit
+    public init(unit: NetworkSpeedUnit = .auto) {
+        self.unit = unit
+    }
+
+    public func format(bytesPerSecond bps: Double) -> String {
+        switch unit {
+        case .auto:
+            return bps >= 1000.0 * 1024.0 ? fixedMB(bps) : fixedKB(bps)
+        case .kbs: return fixedKB(bps)
+        case .mbs: return fixedMB(bps)
+        case .kbps: return fixedBits(bps * 8 / 1000, unit: "Kbps")
+        case .mbps: return fixedBits(bps * 8 / 1_000_000, unit: "Mbps")
+        }
+    }
+
+    private func fixedKB(_ bps: Double) -> String {
+        "\(Self.paddedInteger(bps / 1024)) KB/s"
+    }
+
+    private func fixedMB(_ bps: Double) -> String {
+        "\(Self.paddedCompact(bps / (1024 * 1024))) MB/s"
+    }
+
+    private func fixedBits(_ value: Double, unit: String) -> String {
+        "\(Self.paddedCompact(value)) \(unit)"
+    }
+
+    private static func paddedInteger(_ value: Double) -> String {
+        String(format: "%3.0f", min(999, max(0, value.rounded())))
+    }
+
+    private static func paddedCompact(_ value: Double) -> String {
+        let clamped = max(0, value)
+        if clamped < 10 {
+            return String(format: "%.1f", clamped)
+        }
+        return String(format: "%3.0f", min(999, clamped.rounded()))
+    }
+}
+
 // MARK: - 内存显示
 
 /// 内存显示格式化（结合 MemoryFormat + MemoryUnit + MemoryStats）。

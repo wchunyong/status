@@ -28,6 +28,21 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(ByteRateFormatter(unit: .mbps).format(bytesPerSecond: 125_000), "1 Mbps")
     }
 
+    func testStatusBarByteRateKeepsThreeColumnValue() {
+        let f = StatusBarByteRateFormatter()
+        XCTAssertEqual(f.format(bytesPerSecond: 0), "  0 KB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 2 * 1024), "  2 KB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 15 * 1024), " 15 KB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 987 * 1024), "987 KB/s")
+    }
+
+    func testStatusBarByteRateAutoPromotesToMB() {
+        let f = StatusBarByteRateFormatter()
+        XCTAssertEqual(f.format(bytesPerSecond: 1.5 * 1024 * 1024), "1.5 MB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 15 * 1024 * 1024), " 15 MB/s")
+        XCTAssertEqual(f.format(bytesPerSecond: 150 * 1024 * 1024), "150 MB/s")
+    }
+
     // MARK: ByteFormatter
 
     func testByteFormatterAutoGB() {
