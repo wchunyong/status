@@ -34,8 +34,8 @@ final class StatusBarItemView: NSView {
 
     private func applySizing() {
         let fit = hostingView.fittingSize
-        let height = min(max(fit.height, 18), 24)
-        let size = NSSize(width: fit.width + 4, height: height)
+        // 高度按内容自然撑开（刘海机菜单栏更高，容得下大字）；仅设下限避免过扁。
+        let size = NSSize(width: fit.width + 4, height: max(fit.height, 18))
         setFrameSize(size)
         hostingView.frame = NSRect(origin: .zero, size: size)
     }
