@@ -6,21 +6,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let store = SettingsStore()
     private lazy var settingsModel = SettingsModel(store: store)
     private let monitor = SystemMonitor()
+    private let monitorModel = MonitorModel()
     private var sampler: Sampler?
     private var statusBar: StatusBarManager?
     private var settingsWindowController: SettingsWindowController?
 
     func applicationDidFinishLaunching(_: Notification) {
-        // 状态栏（含菜单）
-        let bar = StatusBarManager(settingsModel: settingsModel)
+        // 状态栏 + 下拉浮窗
+        let bar = StatusBarManager(settingsModel: settingsModel, monitorModel: monitorModel)
         bar.onOpenSettings = { [weak self] in self?.showSettings() }
         bar.onQuit = { NSApplication.shared.terminate(nil) }
         statusBar = bar
 
-        // 采样调度：后台采集，主线程刷新 UI（B8）
+        // 采样调度：后台采集，主线程刷新 UI（B8）；写入 monitorModel 供浮窗 1s 自动刷新
         let interval = settingsModel.value.refreshIntervalSeconds
-        let sampler = Sampler(interval: interval, monitor: monitor) { [weak bar] sample in
-            Task { @MainActor in bar?.update(with: sample) }
+        let model = monitorModel
+        let sampler = Sampler(interval: interval, monitor: monitor) { [weak bar, weak model] sample in
+            Task { @MainActor in
+                model?.sample = sample
+                bar?.update(with: sample)
+            }
         }
         sampler.start()
         self.sampler = sampler

@@ -18,7 +18,7 @@
 | 语言 | Swift 6（tools-version 6.0 → 默认 Swift 6 模式） | strict concurrency；B8 靠 @MainActor/actor/Sendable 保证 |
 | 构建系统 | **Swift Package Manager**（ADR D6） | 核心库 + 可执行壳；.xcodeproj 打包留 M7 |
 | 状态栏 UI | AppKit（`NSStatusItem` + `attributedTitle`） | 轻量；R-014 见 §3 备注 |
-| 菜单 | `NSMenu` + 自定义 `MenuSectionView`（NSView） | D4：菜单而非 Popover |
+| 下拉浮窗 | `NSPopover` + SwiftUI `DetailPanelView`（绑定 MonitorModel，1s 自动刷新） | D4 修订：浮窗而非菜单 |
 | 设置窗口 | SwiftUI（`NSWindow` + `NSHostingController` + `@AppStorage` 思路） | macOS 14+ |
 | 视觉材质 | `.glassEffect()`（26+）/ `.ultraThinMaterial` 回退 | 集中封装于 `GlassMaterial`，B7 |
 | CPU 采集 | Mach `host_processor_info(PROCESSOR_CPU_LOAD_INFO)` | 释放见 B1 |
@@ -94,7 +94,7 @@
 
 | ID | 任务 | 依赖 | 状态 | 验收 / 关联铁律 |
 |----|------|------|------|-----------------|
-| R-018 | `NSMenu` + `MenuSectionView`（网络/内存/CPU，`menuWillOpen` 刷新） | R-011, R-014 | ✅ | 点击弹菜单，三区块读最新 `Sample`；D4 |
+| R-018 | `NSPopover` + `DetailPanelView`（网络/内存/CPU 卡片 + 进度条 + breakdown，绑定 MonitorModel 1s 刷新） | R-011, R-014 | ✅ | 点击弹浮窗，明细更详细；D4 修订 |
 | R-019 | `GlassMaterial`：26+ `.glassEffect()` / 回退 `.ultraThinMaterial` | R-018 | ✅ | 编译期 `if #available` 分支；B7 |
 | R-020 | 菜单「⚙ 设置…」「⏻ 退出」入口 | R-016, R-018 | ✅ | 打开设置窗口 / 终止 App |
 
@@ -135,12 +135,12 @@ Phase 5:  R-011 ─▶ R-021
 
 ## 5. 指标 × 信息面 矩阵
 
-| 指标 | 状态栏（常驻） | 菜单详情（点击） | 设置可配（Tab） |
-|------|:--------------:|:----------------:|-----------------|
-| 网络下行 ↓ | ✅ 速率 | ✅ 速率 | 网络：单位 / 箭头 |
-| 网络上行 ↑ | ✅ 速率 | ✅ 速率 | 网络：同上 |
-| 内存 | ✅ 已用/百分比 | ✅ 已用·总量（usedOfTotal） | 内存：单位 / 格式 |
-| CPU | ✅ 总占用% | ✅ 总占用% | CPU：单核显隐（菜单占位） |
+| 指标 | 状态栏（常驻） | 浮窗详情（点击，1s 刷新） | 设置可配（Tab） |
+|------|:--------------:|:--------------------------:|-----------------|
+| 网络下行 ↓ | ✅ 速率 | ✅ 速率（大号） | 网络：单位 / 箭头 |
+| 网络上行 ↑ | ✅ 速率 | ✅ 速率（大号） | 网络：同上 |
+| 内存 | ✅ 已用/百分比 | ✅ 已用·总量 + % + 进度条 + App/Wired/压缩 明细 | 内存：单位 / 格式 |
+| CPU | ✅ 总占用% | ✅ 总占用%（大号）+ 进度条 | CPU：单核显隐（占位） |
 | （全局） | 顺序/显隐/紧凑 | — | 显示：顺序(↑↓) / 显隐 / 紧凑 |
 | 设置入口 | — | ✅「⚙ 设置…」 | 通用：自启动 / 刷新间隔 / 外观 |
 | 退出 | — | ✅「⏻ 退出」 | — |
@@ -201,11 +201,11 @@ R-021~R-026 无法在无人工介入下完成，原因：
 - **备选**：首发即带 sparkline——被否，抬高出 bug 概率，与稳定优先冲突。
 - **后果**：`SystemMonitor` 侧不阻塞后续加历史缓冲（数据天然可得）；矩阵「菜单详情」列 v1.1 追加。
 
-### D4 · 点击交互用 NSMenu（非 Popover）
-- **背景**：需在「详情 + 设置 + 退出」之间选一个主交互载体。
-- **决策**：`NSMenu`，内含网络/内存/CPU 区块（自定义 `MenuSectionView` 的 `NSMenuItem`）+ 设置/退出项；26+ 自动获得液态玻璃。
-- **备选**：`NSPopover` + SwiftUI 内容——更灵活但更重、渲染开销更高。
-- **后果**：菜单内容用自定义 view，灵活度低于 SwiftUI，但更省更原生；未来图表若超出菜单空间，再评估独立 `NSPanel`。
+### D4 · 点击交互：NSPopover 浮窗（2026-06-30 修订，原为 NSMenu）
+- **背景**：初版按 NSMenu 实现；用户参考效果图后要求「下拉窗口更详细 + 1s 刷新」，菜单的自定义 view 难承载富布局/进度条/自动刷新。
+- **决策（修订）**：改用 `NSPopover` + SwiftUI `DetailPanelView`——网络/内存/CPU 卡片（大号数值 + 进度条 + breakdown），底部「设置…」「退出」；绑定 `MonitorModel`（Sampler 每秒写入 `sample`）→ 浮窗默认 1s 自动刷新；26+ 经 `.glassEffect()` 液态玻璃。
+- **原决策**：`NSMenu` + 自定义 `MenuSectionView`（已废弃、文件删除）。
+- **后果**：SwiftUI 富布局/动画/刷新更顺，信息密度高；sparkline 等易加（D3）。代价是失去「纯原生菜单」质感、浮窗需 `behavior=.transient` 管理显隐。
 
 ### D5 · 分发用官网 DMG + Developer ID 公证
 - **背景**：需选择分发渠道。

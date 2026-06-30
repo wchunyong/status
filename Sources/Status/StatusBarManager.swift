@@ -1,33 +1,40 @@
 import AppKit
 import StatusCore
+import SwiftUI
 
-/// 管理状态栏项 + 下拉菜单。@MainActor（B8）。
-/// 状态栏用 `attributedTitle` 渲染文本（最轻量，R-014）；菜单用自定义 `MenuSectionView`（R-018）。
+/// 管理状态栏项 + 下拉浮窗。@MainActor（B8）。
+/// 状态栏用 `attributedTitle` 渲染（R-014）；浮窗用 `NSPopover` + SwiftUI 详情（R-018 修订，D4）。
 @MainActor
 final class StatusBarManager: NSObject {
     var onOpenSettings: (() -> Void)?
     var onQuit: (() -> Void)?
 
     private let statusItem: NSStatusItem
+    private let popover: NSPopover
     private let settingsModel: SettingsModel
-    private var latestSample: Sample?
+    private let monitorModel: MonitorModel
 
-    private var networkView: MenuSectionView?
-    private var memoryView: MenuSectionView?
-    private var cpuView: MenuSectionView?
-
-    init(settingsModel: SettingsModel) {
+    init(settingsModel: SettingsModel, monitorModel: MonitorModel) {
         self.settingsModel = settingsModel
+        self.monitorModel = monitorModel
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        popover = NSPopover()
         super.init()
-        configureMenu()
-        statusItem.button?.attributedTitle = Self.render("Status") // R-005 占位
+
+        popover.behavior = .transient
+        popover.animates = true
+
+        if let button = statusItem.button {
+            button.image = nil
+            button.attributedTitle = Self.render("Status")
+            button.action = #selector(togglePopover)
+            button.target = self
+        }
     }
 
     // MARK: Sample 驱动
 
     func update(with sample: Sample) {
-        latestSample = sample
         statusItem.button?.attributedTitle = Self.render(composeStatusText(sample: sample))
     }
 
@@ -61,56 +68,26 @@ final class StatusBarManager: NSObject {
         ])
     }
 
-    // MARK: 菜单
+    // MARK: 浮窗
 
-    private func configureMenu() {
-        let menu = NSMenu()
-        menu.delegate = self
-
-        let net = MenuSectionView(title: "网络")
-        let mem = MenuSectionView(title: "内存")
-        let cpu = MenuSectionView(title: "CPU")
-        networkView = net
-        memoryView = mem
-        cpuView = cpu
-
-        for view in [net, mem, cpu] {
-            let item = NSMenuItem()
-            item.view = view
-            item.isEnabled = false
-            menu.addItem(item)
+    @objc private func togglePopover() {
+        guard let button = statusItem.button else { return }
+        if popover.isShown {
+            popover.performClose(nil)
+            return
         }
-        menu.addItem(.separator())
-
-        let settings = NSMenuItem(title: "设置…", action: #selector(openSettings), keyEquivalent: ",")
-        settings.target = self
-        menu.addItem(settings)
-
-        let quit = NSMenuItem(title: "退出 Status", action: #selector(quit), keyEquivalent: "q")
-        quit.target = self
-        menu.addItem(quit)
-
-        statusItem.menu = menu
-    }
-
-    @objc private func openSettings() {
-        onOpenSettings?()
-    }
-
-    @objc private func quit() {
-        onQuit?()
-    }
-}
-
-extension StatusBarManager: NSMenuDelegate {
-    func menuWillOpen(_: NSMenu) {
-        guard let sample = latestSample else { return }
-        let s = settingsModel.value
-        let rate = ByteRateFormatter(unit: s.networkUnit)
-        let down = rate.format(bytesPerSecond: sample.networkRate.bytesPerSecondIn)
-        let up = rate.format(bytesPerSecond: sample.networkRate.bytesPerSecondOut)
-        networkView?.setValue("↓ \(down)     ↑ \(up)")
-        memoryView?.setValue(MemoryDisplayFormatter(format: .usedOfTotal, unit: s.memoryUnit).string(for: sample.memory))
-        cpuView?.setValue("\(PercentFormatter().format(fraction: sample.cpuFraction))")
+        let panel = DetailPanelView(
+            monitor: monitorModel,
+            settings: settingsModel,
+            onOpenSettings: { [weak self] in
+                self?.popover.performClose(nil)
+                self?.onOpenSettings?()
+            },
+            onQuit: { [weak self] in
+                self?.onQuit?()
+            }
+        )
+        popover.contentViewController = NSHostingController(rootView: panel)
+        popover.show(relativeTo: button.bounds, of: button, preferredEdge: .minY)
     }
 }

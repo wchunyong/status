@@ -56,7 +56,7 @@
 | D1 | 部署目标 | macOS 14.0+（渐进增强） |
 | D2 | App 名称 | Status |
 | D3 | 首发 sparkline | 不做，留 v1.1 |
-| D4 | 点击交互 | NSMenu（详情 +「设置…」+「退出」） |
+| D4 | 点击交互 | NSPopover 浮窗（明细 + 设置… + 退出，1s 刷新） |
 | D5 | 分发方式 | 官网 DMG + Developer ID 公证 |
 
 ---
@@ -103,9 +103,9 @@
 
 > 全部设置经 `@AppStorage` / `UserDefaults` 持久化，改动实时反映到状态栏。
 
-### 5.3 菜单详情（核心交互）
+### 5.3 下拉浮窗详情（核心交互，2026-06-30 修订）
 
-点击状态栏图标 → 下拉 **NSMenu**，分区块展示（每块为自定义 `NSView` 的 `NSMenuItem`）：
+点击状态栏图标 → 弹出 **NSPopover**（SwiftUI `DetailPanelView`），分卡片展示，**默认随 1s 采样自动刷新**（绑定 `MonitorModel`）：
 
 ```
 ╭────────────────────────────────────╮
@@ -123,8 +123,8 @@
 ╰────────────────────────────────────╯
 ```
 
-- 菜单在 macOS 26+ 自动应用液态玻璃；14–25 使用系统标准材质。
-- 详情数值随上次采样刷新；菜单打开时拉取最新一次 `Sample`（无额外高频轮询）。
+- macOS 26+ 经 `.glassEffect()` 液态玻璃；14–25 回退 `.ultraThinMaterial`（B7）。浮窗 `behavior=.transient`，点外部自动关闭。
+- 原 NSMenu 方案见 ROADMAP ADR D4（已废弃、文件删除）。
 
 ### 5.4 后续规划（Post-MVP）
 
