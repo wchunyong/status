@@ -28,7 +28,7 @@
 | 时间 | `clock_gettime(CLOCK_MONOTONIC)` | B5，禁墙钟 |
 | 自启动 | `SMAppService.mainApp` | macOS 13+；需签名 bundle（D5/M7） |
 | 持久化 | `UserDefaults`（JSON blob） | 无数据库 |
-| 测试 | XCTest（59 用例） | 见 `CLAUDE.md` §8 |
+| 测试 | XCTest（60 用例） | 见 `CLAUDE.md` §8 |
 | 构建/分发 | `swift build` / `xcodebuild`；DMG + Developer ID + `notarytool`（M7） | D5/D6 |
 | 部署目标 | **macOS 14.0（Sonoma）** | 26+ 特性 `if #available` 渐进启用，B7 |
 | 门禁 | SwiftLint + SwiftFormat + `swift test`（`scripts/gate.sh`） | R-002 |
@@ -58,7 +58,7 @@
 | ID | 任务 | 依赖 | 状态 | 验收 / 关联铁律 |
 |----|------|------|------|-----------------|
 | R-001 | 创建工程（SPM `Status.app`），部署目标 macOS 14，git 初始化 | — | ✅ | `swift build` 产出可执行；B6（无网络权限） |
-| R-002 | 配置 SwiftLint + SwiftFormat + XCTest + `scripts/gate.sh` | R-001 | ✅ | 门禁全绿；59 用例通过 |
+| R-002 | 配置 SwiftLint + SwiftFormat + XCTest + `scripts/gate.sh` | R-001 | ✅ | 门禁全绿；60 用例通过 |
 | R-003 | `NSStatusItem` + AppDelegate/`@main` 生命周期（`.accessory`） | R-001 | ✅ | 启动出现状态栏项；B8 |
 | R-004 | `SMAppService` 自启动 + `NSWorkspace.didWakeNotification` 监听 | R-003 | ✅ | 唤醒回调触发 `monitor.resetAfterWake()`（B4） |
 | R-005 | 状态栏显示文字（冒烟） | R-003 | ✅ | 启动存活 3s 无崩溃（headless 冒烟通过） |
@@ -231,7 +231,7 @@ R-021~R-026 无法在无人工介入下完成，原因：
 
 ### D6 · 构建系统采用 Swift Package Manager（非 .xcodeproj）
 - **背景**：需可在命令行完整构建+测试（agent 自主推进环境无 Xcode GUI 操作）。核心逻辑要可被 `swift test` 全覆盖。
-- **决策**：用 SPM（`Package.swift`）。`StatusCore` 库承载全部纯逻辑（采集口径/格式化/设置，59 单测覆盖）；`Status` 可执行目标承载 AppKit/SwiftUI 壳；`setActivationPolicy(.accessory)` 实现 menu-bar-only（运行期等价 LSUIElement，开发期无需 .app bundle）。
+- **决策**：用 SPM（`Package.swift`）。`StatusCore` 库承载全部纯逻辑（采集口径/格式化/设置，60 单测覆盖）；`Status` 可执行目标承载 AppKit/SwiftUI 壳；`setActivationPolicy(.accessory)` 实现 menu-bar-only（运行期等价 LSUIElement，开发期无需 .app bundle）。
 - **备选**：① XcodeGen 生成 .xcodeproj——未安装，且 pbxproj 易错；② 手写 pbxproj——脆弱。均被否。
 - **后果 / 取舍**：
   - 网络采集改用 **sysctl `NET_RT_IFLIST2`**（原生 64 位 `if_data64`，无 4GB 回绕），比 PRD 附录 A.1 草案的 `getifaddrs`（32 位 `ifi_ibytes`）更准；属实现改进，口径（B2）不变。

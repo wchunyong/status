@@ -40,9 +40,10 @@ final class FanTests: XCTestCase {
         settings.fanControlMode = .fixedRPM
         settings.fanFixedRPM = 2400
 
-        _ = controller.sample(settings: settings)
+        let fixedStatus = controller.sample(settings: settings)
         _ = controller.sample(settings: settings)
         XCTAssertEqual(driver.fixedRPMCalls, [2400])
+        XCTAssertEqual(fixedStatus.fanRPM, 2400)
 
         settings.fanControlMode = .system
         _ = controller.sample(settings: settings)
@@ -64,6 +65,23 @@ final class FanTests: XCTestCase {
 
         let status = controller.sample(settings: settings)
         XCTAssertEqual(status.fanRPM, 2400)
+    }
+
+    func testFanControllerUsesFixedTargetWhenRealtimeRPMIsImplausible() {
+        let driver = FakeFanDriver(status: FanStatus(
+            averageTemperatureCelsius: 49,
+            fanRPM: 16,
+            isSupported: true,
+            unavailableReason: nil
+        ))
+        let controller = FanController(driver: driver)
+
+        var settings = StatusSettings()
+        settings.fanControlMode = .fixedRPM
+        settings.fanFixedRPM = 3000
+
+        let status = controller.sample(settings: settings)
+        XCTAssertEqual(status.fanRPM, 3000)
     }
 
     func testFanControllerReturnsUnsupportedStatusWithoutWriting() {

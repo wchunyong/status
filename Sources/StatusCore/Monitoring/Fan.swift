@@ -108,9 +108,7 @@ public final class FanController: @unchecked Sendable {
         }
 
         let updatedStatus = driver.readStatus()
-        guard let targetRPM = fixedTargetRPM, (updatedStatus.fanRPM ?? 0) <= 0 else {
-            return updatedStatus
-        }
+        guard let targetRPM = fixedTargetRPM else { return updatedStatus }
         return FanStatus(
             averageTemperatureCelsius: updatedStatus.averageTemperatureCelsius,
             fanRPM: targetRPM,
