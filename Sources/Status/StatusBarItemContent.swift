@@ -14,6 +14,7 @@ struct StatusBarItemContent: View {
         static let itemSpacing: CGFloat = 10
         static let networkWidth: CGFloat = 65
         static let percentWidth: CGFloat = 30
+        static let fanWidth: CGFloat = 42
         static let rowSpacing: CGFloat = 0
         static let networkLeadingInset: CGFloat = 5
         static let arrowWidth: CGFloat = 14
@@ -44,7 +45,13 @@ struct StatusBarItemContent: View {
     }
 
     private var visibleItems: [StatusItem] {
-        s.itemOrder.filter { s.isVisible($0) }
+        s.itemOrder.filter { item in
+            guard s.isVisible(item) else { return false }
+            if item == .fan {
+                return sample?.fanStatus.isSupported ?? AppleSiliconSupport.isSupported()
+            }
+            return true
+        }
     }
 
     @ViewBuilder
@@ -60,6 +67,8 @@ struct StatusBarItemContent: View {
             percentModule(sample?.memory.usedFraction ?? 0, label: "MEM")
         case .cpu:
             percentModule(sample?.cpuFraction ?? 0, label: "CPU")
+        case .fan:
+            fanModule(sample?.fanStatus ?? .unavailable)
         }
     }
 
@@ -89,5 +98,21 @@ struct StatusBarItemContent: View {
                 .lineLimit(1)
         }
         .frame(width: Layout.percentWidth)
+    }
+
+    private func fanModule(_ status: FanStatus) -> some View {
+        let formatter = FanDisplayFormatter()
+        return VStack(spacing: Layout.rowSpacing) {
+            Text(formatter.temperatureString(status.averageTemperatureCelsius))
+                .font(.system(size: 10, weight: .semibold))
+                .monospacedDigit()
+                .lineLimit(1)
+                .minimumScaleFactor(0.9)
+            Text(formatter.rpmString(status.fanRPM))
+                .font(.system(size: 8, weight: .bold))
+                .monospacedDigit()
+                .lineLimit(1)
+        }
+        .frame(width: Layout.fanWidth)
     }
 }

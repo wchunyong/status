@@ -11,9 +11,10 @@ struct SettingsView: View {
             network.tabItem { Label("网络", systemImage: "network") }
             memory.tabItem { Label("内存", systemImage: "memorychip") }
             cpuTab.tabItem { Label("CPU", systemImage: "cpu") }
+            fan.tabItem { Label("风扇", systemImage: "fan") }
             display.tabItem { Label("显示", systemImage: "rectangle.3.group") }
         }
-        .frame(width: 480, height: 340)
+        .frame(width: 500, height: 380)
         .onChange(of: model.value) { _, _ in model.persist() }
     }
 
@@ -89,6 +90,43 @@ struct SettingsView: View {
         .padding()
     }
 
+    // MARK: 风扇
+
+    private var fan: some View {
+        Form {
+            if !AppleSiliconSupport.isSupported() {
+                Text("风扇功能仅支持 Apple Silicon Mac，当前设备已禁用。")
+                    .foregroundStyle(.secondary)
+            }
+
+            Picker("控制模式", selection: $model.value.fanControlMode) {
+                Text("系统默认").tag(FanControlMode.system)
+                Text("固定转速").tag(FanControlMode.fixedRPM)
+            }
+            .disabled(!AppleSiliconSupport.isSupported())
+
+            Stepper(
+                value: Binding(
+                    get: { model.value.fanFixedRPM },
+                    set: { model.value.fanFixedRPM = FanRPMPolicy.clamp($0) }
+                ),
+                in: FanRPMPolicy.minimum ... FanRPMPolicy.maximum,
+                step: 100
+            ) {
+                Text("固定转速：\(model.value.fanFixedRPM) RPM")
+                    .monospacedDigit()
+            }
+            .disabled(!AppleSiliconSupport.isSupported() || model.value.fanControlMode != .fixedRPM)
+
+            Button("恢复系统默认") {
+                model.value.fanControlMode = .system
+            }
+            .disabled(!AppleSiliconSupport.isSupported())
+        }
+        .formStyle(.grouped)
+        .padding()
+    }
+
     // MARK: 显示
 
     private var display: some View {
@@ -137,6 +175,7 @@ private extension StatusItem {
         case .network: "网络"
         case .memory: "内存"
         case .cpu: "CPU"
+        case .fan: "风扇"
         }
     }
 }
