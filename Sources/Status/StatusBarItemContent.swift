@@ -15,10 +15,14 @@ struct StatusBarItemContent: View {
         static let networkWidth: CGFloat = 65
         static let percentWidth: CGFloat = 30
         static let fanWidth: CGFloat = 42
-        static let rowSpacing: CGFloat = 0
+        static let rowSpacing: CGFloat = -1
         static let networkLeadingInset: CGFloat = 5
         static let arrowWidth: CGFloat = 14
         static let arrowTextSpacing: CGFloat = 3
+        static let primaryFontSize: CGFloat = 9.5
+        static let secondaryFontSize: CGFloat = 7.5
+        static let networkFontSize: CGFloat = 8.5
+        static let arrowFontSize: CGFloat = 7.5
     }
 
     private var sample: Sample? {
@@ -75,10 +79,10 @@ struct StatusBarItemContent: View {
     private func rateRow(symbol: String, bps: Double) -> some View {
         HStack(alignment: .firstTextBaseline, spacing: Layout.arrowTextSpacing) {
             Text(symbol)
-                .font(.system(size: 8, weight: .regular))
+                .font(.system(size: Layout.arrowFontSize, weight: .regular))
                 .frame(width: Layout.arrowWidth, alignment: .center)
             Text(StatusBarByteRateFormatter(unit: s.networkUnit).format(bytesPerSecond: bps))
-                .font(.system(size: 9, weight: .medium))
+                .font(.system(size: Layout.networkFontSize, weight: .medium))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
@@ -89,12 +93,12 @@ struct StatusBarItemContent: View {
     private func percentModule(_ fraction: Double, label: String) -> some View {
         VStack(spacing: Layout.rowSpacing) {
             Text("\(Int((fraction * 100).rounded()))%")
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: Layout.primaryFontSize, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
             Text(label)
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: Layout.secondaryFontSize, weight: .bold))
                 .lineLimit(1)
         }
         .frame(width: Layout.percentWidth)
@@ -104,12 +108,12 @@ struct StatusBarItemContent: View {
         let formatter = FanDisplayFormatter()
         return VStack(spacing: Layout.rowSpacing) {
             Text(formatter.temperatureString(status.averageTemperatureCelsius))
-                .font(.system(size: 10, weight: .semibold))
+                .font(.system(size: Layout.primaryFontSize, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
             Text(formatter.rpmString(status.fanRPM))
-                .font(.system(size: 8, weight: .bold))
+                .font(.system(size: Layout.secondaryFontSize, weight: .bold))
                 .monospacedDigit()
                 .lineLimit(1)
         }

@@ -6,6 +6,11 @@ import SwiftUI
 /// 固定尺寸（按 fittingSize），mouseDown 触发点击（状态栏里比 SwiftUI Button 更稳）。@MainActor（B8）。
 @MainActor
 final class StatusBarItemView: NSView {
+    private enum Layout {
+        static let horizontalPadding: CGFloat = 4
+        static let verticalOpticalOffset: CGFloat = -1
+    }
+
     var onClick: (() -> Void)?
     private let hostingView: NSHostingView<StatusBarItemContent>
 
@@ -35,12 +40,12 @@ final class StatusBarItemView: NSView {
     private func applySizing() {
         let fit = hostingView.fittingSize
         let statusBarHeight = NSStatusBar.system.thickness
-        let size = NSSize(width: fit.width + 4, height: max(statusBarHeight, fit.height))
+        let size = NSSize(width: fit.width + Layout.horizontalPadding, height: max(statusBarHeight, fit.height))
         setFrameSize(size)
 
         let origin = NSPoint(
             x: 0,
-            y: floor((size.height - fit.height) / 2) - 2
+            y: floor((size.height - fit.height) / 2) + Layout.verticalOpticalOffset
         )
         hostingView.frame = NSRect(origin: origin, size: NSSize(width: size.width, height: fit.height))
     }
