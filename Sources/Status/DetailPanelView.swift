@@ -1,9 +1,9 @@
 import StatusCore
 import SwiftUI
 
-/// 下拉浮窗内容（R-018/D4）。**不**套 .glassEffect()——它在面板尺寸下默认渲染成胶囊
-/// （即"大圆"色块），且与 NSPopover 自带背景叠加。改用 NSPopover 原生材质（macOS 26
-/// 已自带现代外观）。复用状态栏设计系统：统一字阶 + SF Symbol + 细进度条。绑定 MonitorModel 1s 刷新。
+/// 下拉浮窗内容（R-018/D4）。由手动定位的 NSPanel 承载，面板本体透明，
+/// 内容层负责材质、圆角与边框。复用状态栏设计系统：统一字阶 + SF Symbol + 细进度条。
+/// 绑定 MonitorModel 1s 刷新。
 struct DetailPanelView: View {
     @ObservedObject var monitor: MonitorModel
     @ObservedObject var settings: SettingsModel
@@ -34,6 +34,11 @@ struct DetailPanelView: View {
         }
         .padding(18)
         .frame(width: 280)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 18, style: .continuous)
+                .strokeBorder(Color(nsColor: .separatorColor).opacity(0.55), lineWidth: 1)
+        }
     }
 
     // MARK: 网络

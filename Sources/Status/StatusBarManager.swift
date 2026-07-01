@@ -4,7 +4,7 @@ import SwiftUI
 
 /// 管理状态栏项（三模块两行）+ 下拉浮窗。@MainActor（B8）。
 /// 状态栏：`StatusBarItemView`（NSHostingView 装 SwiftUI 内容，图5 样式，R-014 修订）。
-/// 浮窗：`NSPopover` + SwiftUI 详情（R-018，D4）。两者都绑定 MonitorModel，随 1s 采样自动刷新。
+/// 浮窗：手动定位的 `NSPanel` + SwiftUI 详情（R-018，D4）。两者都绑定 MonitorModel，随 1s 采样自动刷新。
 @MainActor
 final class StatusBarManager: NSObject {
     var onOpenSettings: (() -> Void)?
@@ -12,21 +12,19 @@ final class StatusBarManager: NSObject {
     var shouldShowPopover: (() -> Bool)?
 
     private let statusItem: NSStatusItem
-    private let popover: NSPopover
     private let statusBarView: StatusBarItemView
     private let settingsModel: SettingsModel
     private let monitorModel: MonitorModel
+    private var detailPanel: NSPanel?
+    private var localEventMonitor: Any?
+    private var globalEventMonitor: Any?
 
     init(settingsModel: SettingsModel, monitorModel: MonitorModel) {
         self.settingsModel = settingsModel
         self.monitorModel = monitorModel
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        popover = NSPopover()
         statusBarView = StatusBarItemView(monitor: monitorModel, settings: settingsModel)
         super.init()
-
-        popover.behavior = .transient
-        popover.animates = true
 
         statusBarView.setOnClick { [weak self] in self?.togglePopover() }
         // NSStatusItem.view 已弃用（10.14+），但自定义多行布局仍需它；macOS 14/26 可用。
@@ -36,8 +34,8 @@ final class StatusBarManager: NSObject {
     // MARK: 浮窗
 
     private func togglePopover() {
-        if popover.isShown {
-            popover.performClose(nil)
+        if detailPanel?.isVisible == true {
+            closePopover()
             return
         }
         guard shouldShowPopover?() ?? true else {
@@ -47,22 +45,79 @@ final class StatusBarManager: NSObject {
             monitor: monitorModel,
             settings: settingsModel,
             onOpenSettings: { [weak self] in
-                self?.popover.performClose(nil)
+                self?.closePopover()
                 self?.onOpenSettings?()
             },
             onQuit: { [weak self] in self?.onQuit?() }
         )
-        popover.contentViewController = NSHostingController(rootView: panel)
-        let anchor = NSRect(
-            x: 0,
-            y: 0,
-            width: statusBarView.bounds.width,
-            height: 1
+        let hosting = NSHostingController(rootView: panel)
+        let size = hosting.view.fittingSize
+        let window = NSPanel(
+            contentRect: NSRect(origin: .zero, size: size),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
         )
-        popover.show(relativeTo: anchor, of: statusBarView, preferredEdge: .minY)
+        window.contentViewController = hosting
+        window.backgroundColor = .clear
+        window.isOpaque = false
+        window.hasShadow = true
+        window.hidesOnDeactivate = true
+        window.level = .popUpMenu
+        window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
+        window.setFrame(panelFrame(size: size), display: true)
+        detailPanel = window
+        installDismissMonitors()
+        window.orderFrontRegardless()
     }
 
     func closePopover() {
-        popover.performClose(nil)
+        detailPanel?.orderOut(nil)
+        detailPanel = nil
+        removeDismissMonitors()
+    }
+
+    private func panelFrame(size: NSSize) -> NSRect {
+        let screen = statusBarView.window?.screen ?? NSScreen.main
+        let visibleFrame = screen?.visibleFrame ?? .zero
+        let statusFrame = statusBarView.window?.convertToScreen(
+            statusBarView.convert(statusBarView.bounds, to: nil)
+        )
+        let preferredMidX = statusFrame?.midX ?? visibleFrame.midX
+        let x = min(
+            max(preferredMidX - size.width / 2, visibleFrame.minX + 8),
+            visibleFrame.maxX - size.width - 8
+        )
+        return NSRect(
+            x: x,
+            y: visibleFrame.maxY - size.height - 6,
+            width: size.width,
+            height: size.height
+        )
+    }
+
+    private func installDismissMonitors() {
+        removeDismissMonitors()
+        let localMask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .keyDown]
+        localEventMonitor = NSEvent.addLocalMonitorForEvents(matching: localMask) { [weak self] event in
+            if event.window !== self?.detailPanel {
+                self?.closePopover()
+            }
+            return event
+        }
+        globalEventMonitor = NSEvent.addGlobalMonitorForEvents(matching: [.leftMouseDown, .rightMouseDown]) { [weak self] _ in
+            Task { @MainActor in self?.closePopover() }
+        }
+    }
+
+    private func removeDismissMonitors() {
+        if let localEventMonitor {
+            NSEvent.removeMonitor(localEventMonitor)
+            self.localEventMonitor = nil
+        }
+        if let globalEventMonitor {
+            NSEvent.removeMonitor(globalEventMonitor)
+            self.globalEventMonitor = nil
+        }
     }
 }
