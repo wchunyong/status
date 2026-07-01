@@ -57,6 +57,8 @@ public enum MemorySnapshotReader {
             inactivePages: UInt64(stats.inactive_count),
             wiredPages: UInt64(stats.wire_count),
             compressedPages: UInt64(stats.compressor_page_count),
+            purgeablePages: UInt64(stats.purgeable_count),
+            internalPages: UInt64(stats.internal_page_count),
             totalBytes: ProcessInfo.processInfo.physicalMemory
         )
     }
