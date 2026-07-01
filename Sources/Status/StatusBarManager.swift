@@ -7,6 +7,13 @@ import SwiftUI
 /// 浮窗：手动定位的 `NSPanel` + SwiftUI 详情（R-018，D4）。两者都绑定 MonitorModel，随 1s 采样自动刷新。
 @MainActor
 final class StatusBarManager: NSObject {
+    private enum Layout {
+        static let panelWidth: CGFloat = 316
+        static let fallbackPanelHeight: CGFloat = 392
+        static let screenPadding: CGFloat = 8
+        static let menuBarGap: CGFloat = 6
+    }
+
     var onOpenSettings: (() -> Void)?
     var onQuit: (() -> Void)?
     var shouldShowPopover: (() -> Bool)?
@@ -51,7 +58,7 @@ final class StatusBarManager: NSObject {
             onQuit: { [weak self] in self?.onQuit?() }
         )
         let hosting = NSHostingController(rootView: panel)
-        let size = hosting.view.fittingSize
+        let size = panelSize(for: hosting)
         let window = NSPanel(
             contentRect: NSRect(origin: .zero, size: size),
             styleMask: [.borderless, .nonactivatingPanel],
@@ -62,7 +69,7 @@ final class StatusBarManager: NSObject {
         window.backgroundColor = .clear
         window.isOpaque = false
         window.hasShadow = true
-        window.hidesOnDeactivate = true
+        window.hidesOnDeactivate = false
         window.level = .popUpMenu
         window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .transient]
         window.setFrame(panelFrame(size: size), display: true)
@@ -85,15 +92,24 @@ final class StatusBarManager: NSObject {
         )
         let preferredMidX = statusFrame?.midX ?? visibleFrame.midX
         let x = min(
-            max(preferredMidX - size.width / 2, visibleFrame.minX + 8),
-            visibleFrame.maxX - size.width - 8
+            max(preferredMidX - size.width / 2, visibleFrame.minX + Layout.screenPadding),
+            visibleFrame.maxX - size.width - Layout.screenPadding
         )
         return NSRect(
             x: x,
-            y: visibleFrame.maxY - size.height - 6,
+            y: visibleFrame.maxY - size.height - Layout.menuBarGap,
             width: size.width,
             height: size.height
         )
+    }
+
+    private func panelSize(for hosting: NSHostingController<DetailPanelView>) -> NSSize {
+        hosting.view.layoutSubtreeIfNeeded()
+        let measured = hosting.sizeThatFits(in: NSSize(width: Layout.panelWidth, height: CGFloat.greatestFiniteMagnitude))
+        let height = measured.height.isFinite && measured.height > 100
+            ? measured.height
+            : Layout.fallbackPanelHeight
+        return NSSize(width: Layout.panelWidth, height: ceil(height))
     }
 
     private func installDismissMonitors() {
