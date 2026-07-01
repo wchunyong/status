@@ -55,7 +55,7 @@ final class StatusBarManager: NSObject {
         popover.contentViewController = NSHostingController(rootView: panel)
         let anchor = NSRect(
             x: 0,
-            y: -3,
+            y: 0,
             width: statusBarView.bounds.width,
             height: 1
         )
