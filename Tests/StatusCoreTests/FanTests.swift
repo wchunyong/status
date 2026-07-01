@@ -13,6 +13,13 @@ final class FanTests: XCTestCase {
         XCTAssertEqual(FanRPMPolicy.clamp(9000), 6500)
     }
 
+    func testFanTemperaturePolicyRejectsZeroReadings() {
+        XCTAssertFalse(FanTemperaturePolicy.isPlausible(0))
+        XCTAssertFalse(FanTemperaturePolicy.isPlausible(4.9))
+        XCTAssertTrue(FanTemperaturePolicy.isPlausible(50))
+        XCTAssertFalse(FanTemperaturePolicy.isPlausible(130))
+    }
+
     #if canImport(IOKit)
         func testSMCStructLayoutMatchesAppleSMCABI() {
             XCTAssertEqual(SMCLayout.keyInfoStride, 12)
@@ -40,6 +47,23 @@ final class FanTests: XCTestCase {
         settings.fanControlMode = .system
         _ = controller.sample(settings: settings)
         XCTAssertEqual(driver.restoreCalls, 1)
+    }
+
+    func testFanControllerUsesFixedTargetWhenRealtimeRPMIsUnavailable() {
+        let driver = FakeFanDriver(status: FanStatus(
+            averageTemperatureCelsius: 49,
+            fanRPM: 0,
+            isSupported: true,
+            unavailableReason: nil
+        ))
+        let controller = FanController(driver: driver)
+
+        var settings = StatusSettings()
+        settings.fanControlMode = .fixedRPM
+        settings.fanFixedRPM = 2400
+
+        let status = controller.sample(settings: settings)
+        XCTAssertEqual(status.fanRPM, 2400)
     }
 
     func testFanControllerReturnsUnsupportedStatusWithoutWriting() {

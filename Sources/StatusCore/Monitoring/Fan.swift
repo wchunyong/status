@@ -63,6 +63,12 @@ public enum FanRPMPolicy {
     }
 }
 
+public enum FanTemperaturePolicy {
+    public static func isPlausible(_ temperature: Double) -> Bool {
+        (5 ... 125).contains(temperature)
+    }
+}
+
 public protocol FanDriver: Sendable {
     func readStatus() -> FanStatus
     func setFixedRPM(_ rpm: Int) -> Bool
@@ -81,6 +87,7 @@ public final class FanController: @unchecked Sendable {
     public func sample(settings: StatusSettings) -> FanStatus {
         let status = driver.readStatus()
         guard status.isSupported else { return status }
+        var fixedTargetRPM: Int?
 
         switch settings.fanControlMode {
         case .system:
@@ -91,6 +98,7 @@ public final class FanController: @unchecked Sendable {
             }
         case .fixedRPM:
             let rpm = FanRPMPolicy.clamp(settings.fanFixedRPM)
+            fixedTargetRPM = rpm
             if appliedMode != .fixedRPM || appliedRPM != rpm {
                 if driver.setFixedRPM(rpm) {
                     appliedMode = .fixedRPM
@@ -99,7 +107,16 @@ public final class FanController: @unchecked Sendable {
             }
         }
 
-        return driver.readStatus()
+        let updatedStatus = driver.readStatus()
+        guard let targetRPM = fixedTargetRPM, (updatedStatus.fanRPM ?? 0) <= 0 else {
+            return updatedStatus
+        }
+        return FanStatus(
+            averageTemperatureCelsius: updatedStatus.averageTemperatureCelsius,
+            fanRPM: targetRPM,
+            isSupported: updatedStatus.isSupported,
+            unavailableReason: updatedStatus.unavailableReason
+        )
     }
 
     public func restoreAutomatic() {
@@ -185,7 +202,7 @@ public final class FanController: @unchecked Sendable {
             guard let value = readKeyValue(key), let temperature = Self.temperature(from: value) else {
                 return nil
             }
-            return Self.isPlausibleTemperature(temperature) ? temperature : nil
+            return FanTemperaturePolicy.isPlausible(temperature) ? temperature : nil
         }
 
         private func readFanRPM() -> Int? {
@@ -299,10 +316,6 @@ public final class FanController: @unchecked Sendable {
             return Double(Float(bitPattern: raw))
         }
 
-        private static func isPlausibleTemperature(_ value: Double) -> Bool {
-            (0 ... 125).contains(value)
-        }
-
         private static func fourCharString(_ code: UInt32) -> String {
             let bytes = [
                 UInt8((code >> 24) & 0xFF),
@@ -342,7 +355,7 @@ public final class FanController: @unchecked Sendable {
             var fallbackValues: [Double] = []
             for service in services {
                 let product = IOHIDServiceClientCopyProperty(service, "Product" as CFString) as? String ?? ""
-                guard let value = temperature(for: service), isPlausibleTemperature(value) else { continue }
+                guard let value = temperature(for: service), FanTemperaturePolicy.isPlausible(value) else { continue }
                 let lowerProduct = product.lowercased()
                 if lowerProduct.contains("tdie") {
                     dieValues.append(value)
@@ -359,10 +372,6 @@ public final class FanController: @unchecked Sendable {
         private static func temperature(for service: CFTypeRef) -> Double? {
             guard let event = IOHIDServiceClientCopyEvent(service, eventTypeTemperature, 0, 0) else { return nil }
             return IOHIDEventGetFloatValue(event, eventFieldTemperature)
-        }
-
-        private static func isPlausibleTemperature(_ value: Double) -> Bool {
-            (0 ... 125).contains(value)
         }
 
         private static func average(_ values: [Double]) -> Double? {

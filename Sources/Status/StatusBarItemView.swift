@@ -40,7 +40,7 @@ final class StatusBarItemView: NSView {
 
         let origin = NSPoint(
             x: 0,
-            y: max(0, floor((size.height - fit.height) / 2))
+            y: floor((size.height - fit.height) / 2) - 2
         )
         hostingView.frame = NSRect(origin: origin, size: NSSize(width: size.width, height: fit.height))
     }

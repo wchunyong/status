@@ -53,7 +53,7 @@ final class StatusBarManager: NSObject {
             onQuit: { [weak self] in self?.onQuit?() }
         )
         popover.contentViewController = NSHostingController(rootView: panel)
-        popover.show(relativeTo: statusBarView.bounds, of: statusBarView, preferredEdge: .minY)
+        popover.show(relativeTo: statusBarView.bounds, of: statusBarView, preferredEdge: .maxY)
     }
 
     func closePopover() {
