@@ -53,7 +53,13 @@ final class StatusBarManager: NSObject {
             onQuit: { [weak self] in self?.onQuit?() }
         )
         popover.contentViewController = NSHostingController(rootView: panel)
-        popover.show(relativeTo: statusBarView.bounds, of: statusBarView, preferredEdge: .maxY)
+        let anchor = NSRect(
+            x: 0,
+            y: -3,
+            width: statusBarView.bounds.width,
+            height: 1
+        )
+        popover.show(relativeTo: anchor, of: statusBarView, preferredEdge: .minY)
     }
 
     func closePopover() {
