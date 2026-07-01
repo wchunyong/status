@@ -3,8 +3,14 @@ import SwiftUI
 
 /// 用 NSWindow + NSHostingController 承载 SwiftUI 设置界面（R-016/R-017）。
 @MainActor
-final class SettingsWindowController {
+final class SettingsWindowController: NSObject, NSWindowDelegate {
+    var onClose: (() -> Void)?
+
     private var controller: NSWindowController?
+
+    var isVisible: Bool {
+        controller?.window?.isVisible ?? false
+    }
 
     init(settingsModel: SettingsModel) {
         let hosting = NSHostingController(rootView: SettingsView(model: settingsModel))
@@ -14,6 +20,8 @@ final class SettingsWindowController {
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 480, height: 360))
         window.center()
+        super.init()
+        window.delegate = self
         controller = NSWindowController(window: window)
     }
 
@@ -21,5 +29,10 @@ final class SettingsWindowController {
         controller?.showWindow(nil)
         controller?.window?.makeKeyAndOrderFront(nil)
         NSApp?.activate()
+    }
+
+    func windowWillClose(_: Notification) {
+        controller = nil
+        onClose?()
     }
 }

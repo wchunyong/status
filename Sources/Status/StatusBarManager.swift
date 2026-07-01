@@ -9,6 +9,7 @@ import SwiftUI
 final class StatusBarManager: NSObject {
     var onOpenSettings: (() -> Void)?
     var onQuit: (() -> Void)?
+    var shouldShowPopover: (() -> Bool)?
 
     private let statusItem: NSStatusItem
     private let popover: NSPopover
@@ -39,6 +40,9 @@ final class StatusBarManager: NSObject {
             popover.performClose(nil)
             return
         }
+        guard shouldShowPopover?() ?? true else {
+            return
+        }
         let panel = DetailPanelView(
             monitor: monitorModel,
             settings: settingsModel,
@@ -50,5 +54,9 @@ final class StatusBarManager: NSObject {
         )
         popover.contentViewController = NSHostingController(rootView: panel)
         popover.show(relativeTo: statusBarView.bounds, of: statusBarView, preferredEdge: .minY)
+    }
+
+    func closePopover() {
+        popover.performClose(nil)
     }
 }

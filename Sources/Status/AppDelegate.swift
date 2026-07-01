@@ -19,6 +19,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let bar = StatusBarManager(settingsModel: settingsModel, monitorModel: monitorModel)
         bar.onOpenSettings = { [weak self] in self?.showSettings() }
         bar.onQuit = { NSApplication.shared.terminate(nil) }
+        bar.shouldShowPopover = { [weak self] in
+            guard self?.settingsWindowController?.isVisible != true else {
+                self?.settingsWindowController?.show()
+                return false
+            }
+            return true
+        }
         statusBar = bar
 
         settingsCancellable = settingsModel.$value.sink { [monitor] settings in
@@ -55,8 +62,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     func showSettings() {
         if settingsWindowController == nil {
-            settingsWindowController = SettingsWindowController(settingsModel: settingsModel)
+            let controller = SettingsWindowController(settingsModel: settingsModel)
+            controller.onClose = { [weak self] in
+                self?.settingsWindowController = nil
+            }
+            settingsWindowController = controller
         }
+        statusBar?.closePopover()
         settingsWindowController?.show()
     }
 }

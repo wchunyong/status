@@ -18,7 +18,7 @@ macOS 菜单栏轻量系统监控 —— 实时显示**网络上下行速率、�
 
 ```bash
 swift build                       # 构建
-swift test                        # 全部测试（55 用例）
+swift test                        # 全部测试（57 用例）
 ./scripts/gate.sh                 # 完整门禁：swiftlint + swiftformat --lint + build + test
 
 swift run Status                  # 直接运行（menu-bar-only）
@@ -32,8 +32,8 @@ SwiftPM 双目标：
 
 ```
 Sources/
-├── StatusCore/          # 纯逻辑库（Swift 6，55 单测覆盖）
-│   ├── Monitoring/      # CPU/Mem/Net/Fan 采集（Mach + sysctl + AppleSMC）+ Sampler + SystemMonitor(actor)
+├── StatusCore/          # 纯逻辑库（Swift 6，57 单测覆盖）
+│   ├── Monitoring/      # CPU/Mem/Net/Fan 采集（Mach + sysctl + AppleSMC/HID）+ Sampler + SystemMonitor(actor)
 │   ├── Formatting/      # ByteRate/Byte/MemoryDisplay/Percent
 │   └── Settings/        # StatusSettings + SettingsStore
 └── Status/              # AppKit/SwiftUI 壳

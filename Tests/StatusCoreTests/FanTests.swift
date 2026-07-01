@@ -13,6 +13,13 @@ final class FanTests: XCTestCase {
         XCTAssertEqual(FanRPMPolicy.clamp(9000), 6500)
     }
 
+    #if canImport(IOKit)
+        func testSMCStructLayoutMatchesAppleSMCABI() {
+            XCTAssertEqual(SMCLayout.keyInfoStride, 12)
+            XCTAssertEqual(SMCLayout.paramStructStride, 80)
+        }
+    #endif
+
     func testFanControllerAppliesFixedRPMOnceAndRestoresSystemMode() {
         let driver = FakeFanDriver(status: FanStatus(
             averageTemperatureCelsius: 49,

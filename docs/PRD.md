@@ -58,7 +58,7 @@
 | D3 | 首发 sparkline | 不做，留 v1.1 |
 | D4 | 点击交互 | NSPopover 浮窗（明细 + 设置… + 退出，1s 刷新） |
 | D5 | 分发方式 | 官网 DMG + Developer ID 公证 |
-| D7 | 风扇与温度 | Apple Silicon-only；Intel 禁用并提示；SMC 失败安全回退 |
+| D7 | 风扇与温度 | Apple Silicon-only；Intel 禁用并提示；SMC/HID 失败安全回退 |
 
 ---
 
@@ -94,9 +94,9 @@
 
 #### F4 风扇与温度（Apple Silicon-only）
 - **平台**：仅支持 Apple Silicon Mac；检测到 Intel / 非 arm64 时禁用该功能，并在设置界面提示用户。
-- **采集**：通过 AppleSMC / IOKit 读取 CPU 与 GPU 常见温度键，分别求组内平均后再取 CPU+GPU 平均；读取第一组风扇实时 RPM。
+- **采集**：优先通过 AppleSMC / IOKit 读取 CPU 与 GPU 常见温度键，分别求组内平均后再取 CPU+GPU 平均；SMC 温度键缺失或返回异常值时，回退到 Apple Silicon HID thermal sensors 的 SoC die 平均温度；读取第一组风扇实时 RPM。
 - **控制**：支持系统默认与固定转速两种模式；固定转速写入保守范围 `1200...6500 RPM`；切回系统默认、退出 App 时尝试恢复自动控制。
-- **失败回退**：SMC 不可访问、温度键缺失、风扇键缺失或写入失败时不崩溃，显示占位 `--°C` / `----R`，并保持 CPU/Mem/Net 正常刷新。
+- **失败回退**：SMC/HID 不可访问、温度键缺失、风扇键缺失或写入失败时不崩溃，显示占位 `--°C` / `----R`，并保持 CPU/Mem/Net 正常刷新。
 - **展示**：状态栏两行 `49°C` / `1400R`；浮窗显示平均温度与转速。
 - **验收**：Apple Silicon 上可读取温度/RPM；设置固定 RPM 后风扇目标变化；恢复系统默认后不再接管；Intel 上控件禁用并提示。
 
@@ -178,7 +178,7 @@ Status (App)
 │   ├── CPUProvider        (Mach)
 │   ├── MemoryProvider     (Mach + sysctl)
 │   ├── NetworkProvider    (getifaddrs)
-│   ├── FanController      (AppleSMC / IOKit, Apple Silicon-only)
+│   ├── FanController      (AppleSMC + HID thermal / IOKit, Apple Silicon-only)
 │   ├── Sampler                          # 单一定时器，utility QoS，coalesce
 │   └── Sample (Sendable)                # 一次采样的不可变快照
 ├── Formatting（格式化层）

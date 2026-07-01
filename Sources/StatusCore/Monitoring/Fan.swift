@@ -169,7 +169,7 @@ public final class FanController: @unchecked Sendable {
             let cpuValues = readTemperatureValues(keys: ["TC0P", "TC0E", "TC0F", "TC0D", "Tp09", "Tp0T"])
             let gpuValues = readTemperatureValues(keys: ["TG0P", "TG0D", "TG0H", "Tg05", "Tg0D"])
             let grouped = [average(cpuValues), average(gpuValues)].compactMap { $0 }
-            return average(grouped)
+            return average(grouped) ?? HIDTemperatureReader.averageTemperature()
         }
 
         private func readTemperatureValues(keys: [String]) -> [Double] {
@@ -182,18 +182,22 @@ public final class FanController: @unchecked Sendable {
         }
 
         private func readTemperature(key: String) -> Double? {
-            guard let bytes = readKey(key), bytes.count >= 2 else { return nil }
-            let raw = UInt16(bytes[0]) << 8 | UInt16(bytes[1])
-            return Double(Int16(bitPattern: raw)) / 256.0
+            guard let value = readKeyValue(key), let temperature = Self.temperature(from: value) else {
+                return nil
+            }
+            return Self.isPlausibleTemperature(temperature) ? temperature : nil
         }
 
         private func readFanRPM() -> Int? {
-            guard let bytes = readKey("F0Ac"), bytes.count >= 2 else { return nil }
-            let raw = UInt16(bytes[0]) << 8 | UInt16(bytes[1])
-            return Int((Double(raw) / 4.0).rounded())
+            guard let value = readKeyValue("F0Ac"), let rpm = Self.fpe2(from: value.bytes) else { return nil }
+            return (0 ... 20000).contains(rpm) ? rpm : nil
         }
 
         private func readKey(_ key: String) -> [UInt8]? {
+            readKeyValue(key)?.bytes
+        }
+
+        private func readKeyValue(_ key: String) -> SMCValue? {
             guard let info = readKeyInfo(key) else { return nil }
             var input = SMCParamStruct()
             var output = SMCParamStruct()
@@ -201,7 +205,10 @@ public final class FanController: @unchecked Sendable {
             input.keyInfo = info
             input.data8 = Command.readBytes.rawValue
             guard call(input: &input, output: &output) else { return nil }
-            return Self.bytes(from: output.bytes, count: Int(info.dataSize))
+            return SMCValue(
+                bytes: Self.bytes(from: output.bytes, count: Int(info.dataSize)),
+                dataType: info.dataType
+            )
         }
 
         private func readKeyInfo(_ key: String) -> SMCKeyInfoData? {
@@ -263,6 +270,49 @@ public final class FanController: @unchecked Sendable {
             }
         }
 
+        private static func temperature(from value: SMCValue) -> Double? {
+            switch fourCharString(value.dataType) {
+            case "sp78":
+                return sp78(from: value.bytes)
+            case "flt ":
+                return float32(from: value.bytes)
+            default:
+                return sp78(from: value.bytes)
+            }
+        }
+
+        private static func sp78(from bytes: [UInt8]) -> Double? {
+            guard bytes.count >= 2 else { return nil }
+            let raw = UInt16(bytes[0]) << 8 | UInt16(bytes[1])
+            return Double(Int16(bitPattern: raw)) / 256.0
+        }
+
+        private static func fpe2(from bytes: [UInt8]) -> Int? {
+            guard bytes.count >= 2 else { return nil }
+            let raw = UInt16(bytes[0]) << 8 | UInt16(bytes[1])
+            return Int((Double(raw) / 4.0).rounded())
+        }
+
+        private static func float32(from bytes: [UInt8]) -> Double? {
+            guard bytes.count >= 4 else { return nil }
+            let raw = UInt32(bytes[0]) << 24 | UInt32(bytes[1]) << 16 | UInt32(bytes[2]) << 8 | UInt32(bytes[3])
+            return Double(Float(bitPattern: raw))
+        }
+
+        private static func isPlausibleTemperature(_ value: Double) -> Bool {
+            (0 ... 125).contains(value)
+        }
+
+        private static func fourCharString(_ code: UInt32) -> String {
+            let bytes = [
+                UInt8((code >> 24) & 0xFF),
+                UInt8((code >> 16) & 0xFF),
+                UInt8((code >> 8) & 0xFF),
+                UInt8(code & 0xFF),
+            ]
+            return String(bytes: bytes, encoding: .utf8) ?? ""
+        }
+
         private static func copy(bytes: [UInt8], to target: inout SMCBytes) {
             withUnsafeMutableBytes(of: &target) { raw in
                 for (index, byte) in bytes.prefix(32).enumerated() {
@@ -271,6 +321,74 @@ public final class FanController: @unchecked Sendable {
             }
         }
     }
+
+    private enum HIDTemperatureReader {
+        private static let usagePageTemperature = 0xFF00
+        private static let usageTemperature = 5
+        private static let eventTypeTemperature: Int64 = 15
+        private static let eventFieldTemperature = Int32(15 << 16)
+
+        static func averageTemperature() -> Double? {
+            guard let client = IOHIDEventSystemClientCreate(kCFAllocatorDefault) else { return nil }
+            let matching = [
+                "PrimaryUsagePage": usagePageTemperature,
+                "PrimaryUsage": usageTemperature,
+            ] as CFDictionary
+            IOHIDEventSystemClientSetMatching(client, matching)
+            guard let services = IOHIDEventSystemClientCopyServices(client) as? [CFTypeRef] else { return nil }
+
+            var dieValues: [Double] = []
+            var deviceValues: [Double] = []
+            var fallbackValues: [Double] = []
+            for service in services {
+                let product = IOHIDServiceClientCopyProperty(service, "Product" as CFString) as? String ?? ""
+                guard let value = temperature(for: service), isPlausibleTemperature(value) else { continue }
+                let lowerProduct = product.lowercased()
+                if lowerProduct.contains("tdie") {
+                    dieValues.append(value)
+                } else if lowerProduct.contains("tdev") {
+                    deviceValues.append(value)
+                } else if !lowerProduct.contains("nand"), !lowerProduct.contains("tcal") {
+                    fallbackValues.append(value)
+                }
+            }
+
+            return average(dieValues) ?? average(deviceValues) ?? average(fallbackValues)
+        }
+
+        private static func temperature(for service: CFTypeRef) -> Double? {
+            guard let event = IOHIDServiceClientCopyEvent(service, eventTypeTemperature, 0, 0) else { return nil }
+            return IOHIDEventGetFloatValue(event, eventFieldTemperature)
+        }
+
+        private static func isPlausibleTemperature(_ value: Double) -> Bool {
+            (0 ... 125).contains(value)
+        }
+
+        private static func average(_ values: [Double]) -> Double? {
+            guard !values.isEmpty else { return nil }
+            return values.reduce(0, +) / Double(values.count)
+        }
+    }
+
+    @_silgen_name("IOHIDEventSystemClientCreate")
+    private func IOHIDEventSystemClientCreate(_ allocator: CFAllocator?) -> CFTypeRef?
+
+    @_silgen_name("IOHIDEventSystemClientSetMatching")
+    private func IOHIDEventSystemClientSetMatching(_ client: CFTypeRef, _ matching: CFDictionary)
+
+    @_silgen_name("IOHIDEventSystemClientCopyServices")
+    private func IOHIDEventSystemClientCopyServices(_ client: CFTypeRef) -> CFArray?
+
+    @_silgen_name("IOHIDServiceClientCopyProperty")
+    private func IOHIDServiceClientCopyProperty(_ service: CFTypeRef, _ key: CFString) -> CFTypeRef?
+
+    @_silgen_name("IOHIDServiceClientCopyEvent")
+    private func IOHIDServiceClientCopyEvent(_ service: CFTypeRef, _ type: Int64, _ options: Int32, _ timeout: Int64)
+        -> CFTypeRef?
+
+    @_silgen_name("IOHIDEventGetFloatValue")
+    private func IOHIDEventGetFloatValue(_ event: CFTypeRef, _ field: Int32) -> Double
 #else
     public enum SMCFanDriver {
         public static func makeDefault() -> FanDriver {
@@ -299,6 +417,13 @@ public struct UnsupportedFanDriver: FanDriver {
     }
 }
 
+#if canImport(IOKit)
+    enum SMCLayout {
+        static let keyInfoStride = MemoryLayout<SMCKeyInfoData>.stride
+        static let paramStructStride = MemoryLayout<SMCParamStruct>.stride
+    }
+#endif
+
 private struct SMCVersion {
     var major: UInt8 = 0
     var minor: UInt8 = 0
@@ -319,6 +444,17 @@ private struct SMCKeyInfoData {
     var dataSize: UInt32 = 0
     var dataType: UInt32 = 0
     var dataAttributes: UInt8 = 0
+    // Keep the Swift layout aligned with the AppleSMC C ABI. Without these
+    // bytes the enclosing SMCParamStruct is 76 bytes instead of 80, and reads
+    // can succeed at the IOKit level while returning empty key data.
+    var reserved0: UInt8 = 0
+    var reserved1: UInt8 = 0
+    var reserved2: UInt8 = 0
+}
+
+private struct SMCValue {
+    let bytes: [UInt8]
+    let dataType: UInt32
 }
 
 private struct SMCBytes {

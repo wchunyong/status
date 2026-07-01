@@ -24,11 +24,11 @@
 | CPU 采集 | Mach `host_processor_info(PROCESSOR_CPU_LOAD_INFO)` | 释放见 B1 |
 | 内存采集 | Mach `host_statistics64(HOST_VM_INFO64)` + `ProcessInfo.physicalMemory` | 口径见 B2；页大小 `getpagesize()` |
 | 网络采集 | sysctl `NET_RT_IFLIST2`（`if_data64` 64 位计数） | 无 4GB 回绕；聚合 UP 且非环回接口 |
-| 风扇/温度 | AppleSMC / IOKit（Apple Silicon-only） | D7；Intel 禁用并提示；退出恢复系统默认 |
+| 风扇/温度 | AppleSMC + HID thermal / IOKit（Apple Silicon-only） | D7；Intel 禁用并提示；退出恢复系统默认 |
 | 时间 | `clock_gettime(CLOCK_MONOTONIC)` | B5，禁墙钟 |
 | 自启动 | `SMAppService.mainApp` | macOS 13+；需签名 bundle（D5/M7） |
 | 持久化 | `UserDefaults`（JSON blob） | 无数据库 |
-| 测试 | XCTest（55 用例） | 见 `CLAUDE.md` §8 |
+| 测试 | XCTest（57 用例） | 见 `CLAUDE.md` §8 |
 | 构建/分发 | `swift build` / `xcodebuild`；DMG + Developer ID + `notarytool`（M7） | D5/D6 |
 | 部署目标 | **macOS 14.0（Sonoma）** | 26+ 特性 `if #available` 渐进启用，B7 |
 | 门禁 | SwiftLint + SwiftFormat + `swift test`（`scripts/gate.sh`） | R-002 |
@@ -58,7 +58,7 @@
 | ID | 任务 | 依赖 | 状态 | 验收 / 关联铁律 |
 |----|------|------|------|-----------------|
 | R-001 | 创建工程（SPM `Status.app`），部署目标 macOS 14，git 初始化 | — | ✅ | `swift build` 产出可执行；B6（无网络权限） |
-| R-002 | 配置 SwiftLint + SwiftFormat + XCTest + `scripts/gate.sh` | R-001 | ✅ | 门禁全绿；55 用例通过 |
+| R-002 | 配置 SwiftLint + SwiftFormat + XCTest + `scripts/gate.sh` | R-001 | ✅ | 门禁全绿；57 用例通过 |
 | R-003 | `NSStatusItem` + AppDelegate/`@main` 生命周期（`.accessory`） | R-001 | ✅ | 启动出现状态栏项；B8 |
 | R-004 | `SMAppService` 自启动 + `NSWorkspace.didWakeNotification` 监听 | R-003 | ✅ | 唤醒回调触发 `monitor.resetAfterWake()`（B4） |
 | R-005 | 状态栏显示文字（冒烟） | R-003 | ✅ | 启动存活 3s 无崩溃（headless 冒烟通过） |
@@ -105,7 +105,7 @@
 | ID | 任务 | 依赖 | 状态 | 验收 / 关联铁律 |
 |----|------|------|------|-----------------|
 | R-027 | Fan 数据模型 / formatter / 设置持久化 | R-012, R-013 | ✅ | 默认系统模式；RPM clamp；旧 JSON 回退；单测覆盖 |
-| R-028 | AppleSMC FanDriver（温度/RPM 读取 + 固定 RPM / 恢复默认） | R-011 | ✅ | Apple Silicon-only；Intel unsupported；SMC 失败占位；B1/B3/B8 |
+| R-028 | AppleSMC/HID FanDriver（温度/RPM 读取 + 固定 RPM / 恢复默认） | R-011 | ✅ | Apple Silicon-only；Intel unsupported；SMC/HID 失败占位；B1/B3/B8 |
 | R-029 | 状态栏 / 浮窗 / 设置页接入 Fan | R-014, R-016, R-018, R-027 | ✅ | 状态栏两行 `49°C`/`1400R`；Intel 设置禁用提示 |
 | R-030 | 退出与系统模式恢复 | R-028 | ✅ | App 退出前尝试 `restoreAutomatic()`；固定 RPM 不跨退出残留 |
 
@@ -181,7 +181,7 @@ Phase 5:  R-011 ─▶ R-021
 | 刘海机状态栏宽度不足 | 文字截断 | 紧凑模式（已实现）；自适应缩短待 R-023 | R-023 |
 | 内存口径与活动监视器细微差异 | 用户困惑 | M6 校准（R-021）；口径 PRD §5.1 + tooltip | B2 |
 | 公证/签名配置错误 | 无法分发 | 待 M7 流水线化；需用户提供 Developer ID | R-026, D5 |
-| AppleSMC 私有接口变化 | 风扇/温度不可用或写入失败 | Apple Silicon-only；Intel 禁用提示；读写失败占位并保持其他指标刷新；退出恢复系统默认 | R-028, D7 |
+| AppleSMC / HID 私有接口变化 | 风扇/温度不可用或写入失败 | Apple Silicon-only；Intel 禁用提示；读写失败占位并保持其他指标刷新；退出恢复系统默认 | R-028, D7 |
 
 ### 6.3 Phase 5 阻塞说明（为什么停在这里）
 R-021~R-026 无法在无人工介入下完成，原因：
@@ -231,7 +231,7 @@ R-021~R-026 无法在无人工介入下完成，原因：
 
 ### D6 · 构建系统采用 Swift Package Manager（非 .xcodeproj）
 - **背景**：需可在命令行完整构建+测试（agent 自主推进环境无 Xcode GUI 操作）。核心逻辑要可被 `swift test` 全覆盖。
-- **决策**：用 SPM（`Package.swift`）。`StatusCore` 库承载全部纯逻辑（采集口径/格式化/设置，55 单测覆盖）；`Status` 可执行目标承载 AppKit/SwiftUI 壳；`setActivationPolicy(.accessory)` 实现 menu-bar-only（运行期等价 LSUIElement，开发期无需 .app bundle）。
+- **决策**：用 SPM（`Package.swift`）。`StatusCore` 库承载全部纯逻辑（采集口径/格式化/设置，57 单测覆盖）；`Status` 可执行目标承载 AppKit/SwiftUI 壳；`setActivationPolicy(.accessory)` 实现 menu-bar-only（运行期等价 LSUIElement，开发期无需 .app bundle）。
 - **备选**：① XcodeGen 生成 .xcodeproj——未安装，且 pbxproj 易错；② 手写 pbxproj——脆弱。均被否。
 - **后果 / 取舍**：
   - 网络采集改用 **sysctl `NET_RT_IFLIST2`**（原生 64 位 `if_data64`，无 4GB 回绕），比 PRD 附录 A.1 草案的 `getifaddrs`（32 位 `ifi_ibytes`）更准；属实现改进，口径（B2）不变。
@@ -240,11 +240,11 @@ R-021~R-026 无法在无人工介入下完成，原因：
   - SMAppService 自启动、本地化、图标、签名都**需要正式 .app bundle**——这些落到 M7：届时用 XcodeGen/Xcode 生成 .xcodeproj，做 bundle（LSUIElement/Info.plist/图标/strings）→ 签名 → 公证 → DMG。
   - R-014 状态栏用 `attributedTitle`（见 §3 备注）。
 
-### D7 · 风扇/温度采用 Apple Silicon-only 的 AppleSMC 路径
-- **背景**：用户需要状态栏显示 CPU+GPU 平均温度与风扇 RPM，并支持固定风扇转速 / 恢复系统默认。该能力没有稳定公开高级 API，主流实现依赖 AppleSMC / IOKit。
-- **决策**：首版只支持 Apple Silicon（`arm64` / `arm64e`）。通过 AppleSMC 读取常见 CPU/GPU 温度键与 `F0Ac` RPM；固定转速写 `F0Tg` 和 `FS!`；恢复默认写 `FS! = 0`。Intel / 非 arm64 直接禁用设置并提示用户。
+### D7 · 风扇/温度采用 Apple Silicon-only 的 AppleSMC + HID 路径
+- **背景**：用户需要状态栏显示 CPU+GPU 平均温度与风扇 RPM，并支持固定风扇转速 / 恢复系统默认。该能力没有稳定公开高级 API，主流实现依赖 AppleSMC / IOKit；Apple Silicon 上传统 SMC 温度键可能缺失或返回无效值。
+- **决策**：首版只支持 Apple Silicon（`arm64` / `arm64e`）。通过 AppleSMC 读取常见 CPU/GPU 温度键与 `F0Ac` RPM；SMC 温度无效时回退到 HID thermal sensors 的 SoC die 平均温度；固定转速写 `F0Tg` 和 `FS!`；恢复默认写 `FS! = 0`。Intel / 非 arm64 直接禁用设置并提示用户。
 - **备选**：同时支持 Intel SMC 键表——被否，硬件差异大、验证面翻倍；只做只读温度——被否，未满足固定转速需求。
-- **后果**：SMC 读写必须失败安全：不可访问时显示占位、不影响其他指标、退出时尝试恢复系统默认；该功能需要真实 Apple Silicon 机器手动验证温度/RPM/固定转速效果。
+- **后果**：SMC/HID 读写必须失败安全：不可访问时显示占位、不影响其他指标、退出时尝试恢复系统默认；该功能需要真实 Apple Silicon 机器手动验证温度/RPM/固定转速效果。
 
 ---
 
