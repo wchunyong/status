@@ -47,7 +47,7 @@
 | **Phase 3** | 设置界面（五 Tab） | ✅ 完成（R-016~R-017） |
 | **Phase 4** | 菜单详情 + 液态玻璃 | ✅ 完成（R-018~R-020） |
 | **Phase 4.5** | Apple Silicon 风扇/温度监控与固定转速 | 🟡 进行中（R-027~R-030） |
-| **Phase 5** | 性能 / 稳定性 / 发布 | 🟡 阻塞：需签名证书 / 24h 老化 / 可视化 QA / 图标设计 / .app bundle（见 §6.3） |
+| **Phase 5** | 性能 / 稳定性 / 发布 | 🟡 阻塞：需签名证书 / 24h 老化 / 可视化 QA / .app bundle（见 §6.3） |
 
 ---
 
@@ -117,7 +117,7 @@
 | R-022 | 唤醒 / 网络切换 / 显示器热插拔回归 | R-018 | 🟡 | 唤醒已接线+测试；网络热插拔随 `NET_RT_IFLIST2` 天然容错；显示器/手动回归待做 |
 | R-023 | 可访问性 + 深浅色 + 刘海屏适配 | R-014, R-018 | 🟡 | 深/浅色已做（外观设置）；可访问性/刘海屏需手动可视化 QA |
 | R-024 | 简体中文本地化（英文回退） | R-016, R-018 | ⬜ | 需 .app bundle 才能加载 strings 表（M7） |
-| R-025 | App 图标（.iconset） | R-001 | ⬜ | 需设计稿 + .app bundle 装载 |
+| R-025 | App 图标（.iconset） | R-001 | ✅ | 浅色 Liquid Glass 图标已生成；`scripts/package.sh` 装载 `Status.icns` |
 | R-026 | DMG + Developer ID 签名 + `notarytool` + `stapler` | 全部特性 | ⬜ | **硬阻塞**：需用户提供 Developer ID 证书（D5） |
 
 ---
@@ -187,7 +187,7 @@ Phase 5:  R-011 ─▶ R-021
 R-021~R-026 无法在无人工介入下完成，原因：
 - **R-021**：真 24h 老化需挂机运行；内存增量精测需 Instruments（GUI）。已用 40 次连续采样的冒烟回归（`testRepeatedSamplingIsCrashFree`）兜底 B1。
 - **R-022 / R-023**：唤醒已接线并测试；网络切换随采集 API 天然容错。但显示器热插拔、刘海屏、可访问性（对比度/加大文本）需**人眼可视化 QA**，agent 无法自证。
-- **R-024 / R-025**：本地化 strings 表与图标都需 **.app bundle** 才能加载；当前为 SPM 裸可执行（D6），bundle 化在 M7。
+- **R-024**：本地化 strings 表需 **.app bundle** 才能加载；当前为 SPM 裸可执行（D6），bundle 化在 M7。R-025 图标已通过本地包装脚本装载。
 - **R-026**：DMG 签名/公证**硬阻塞**，需用户提供 Developer ID Application 证书。
 
 > 推进方式：进入 M7 时（用户提供证书 + 设计稿后），用 XcodeGen 或 Xcode 生成 .xcodeproj → 正式 .app bundle（LSUIElement/图标/本地化）→ 签名 → `notarytool` 公证 → DMG。

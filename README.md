@@ -54,4 +54,3 @@ Sources/
 - **R-026** DMG + Developer ID 签名 + `notarytool` 公证 —— 需提供证书
 - **R-021** 24h 内存老化 + Instruments —— 需挂机
 - **R-023** 可访问性 / 刘海屏 —— 需可视化 QA
-- **R-025** App 图标 —— 需设计稿

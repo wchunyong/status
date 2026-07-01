@@ -6,6 +6,7 @@ cd "$(dirname "$0")/.."
 
 VERSION="0.1.0"
 BUNDLE_ID="com.wchunyong.status"
+ICON="assets/icon/Status.icns"
 
 echo "▶ swift build -c release"
 swift build -c release
@@ -20,6 +21,11 @@ mkdir -p "$APP/Contents/MacOS"
 mkdir -p "$APP/Contents/Resources"
 cp "$BINARY" "$APP/Contents/MacOS/Status"
 chmod +x "$APP/Contents/MacOS/Status"
+if [[ -f "$ICON" ]]; then
+  cp "$ICON" "$APP/Contents/Resources/Status.icns"
+else
+  echo "⚠️ missing icon: $ICON"
+fi
 
 cat > "$APP/Contents/Info.plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
@@ -30,6 +36,7 @@ cat > "$APP/Contents/Info.plist" <<EOF
   <key>CFBundleDisplayName</key><string>Status</string>
   <key>CFBundleIdentifier</key><string>${BUNDLE_ID}</string>
   <key>CFBundleExecutable</key><string>Status</string>
+  <key>CFBundleIconFile</key><string>Status</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>CFBundleVersion</key><string>1</string>
   <key>CFBundleShortVersionString</key><string>${VERSION}</string>
