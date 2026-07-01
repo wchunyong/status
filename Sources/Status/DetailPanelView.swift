@@ -80,7 +80,7 @@ struct DetailPanelView: View {
             }
             progressBar(mem?.usedFraction ?? 0)
             HStack(spacing: 14) {
-                chip("App", mem?.activeBytes ?? 0)
+                chip("App", mem?.appMemoryBytes ?? 0)
                 chip("Wired", mem?.wiredBytes ?? 0)
                 chip("压缩", mem?.compressedBytes ?? 0)
                 Spacer()

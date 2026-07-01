@@ -12,10 +12,13 @@ public struct MemoryStats: Sendable, Equatable, Codable {
     public let inactivePages: UInt64
     public let wiredPages: UInt64
     public let compressedPages: UInt64
+    public let purgeablePages: UInt64
+    public let internalPages: UInt64
     public let totalBytes: UInt64
 
     public init(pageSize: UInt64, freePages: UInt64, activePages: UInt64,
                 inactivePages: UInt64, wiredPages: UInt64, compressedPages: UInt64,
+                purgeablePages: UInt64 = 0, internalPages: UInt64 = 0,
                 totalBytes: UInt64)
     {
         self.pageSize = pageSize
@@ -24,6 +27,8 @@ public struct MemoryStats: Sendable, Equatable, Codable {
         self.inactivePages = inactivePages
         self.wiredPages = wiredPages
         self.compressedPages = compressedPages
+        self.purgeablePages = purgeablePages
+        self.internalPages = internalPages
         self.totalBytes = totalBytes
     }
 
@@ -47,6 +52,18 @@ public struct MemoryStats: Sendable, Equatable, Codable {
         compressedPages &* pageSize
     }
 
+    public var purgeableBytes: UInt64 {
+        purgeablePages &* pageSize
+    }
+
+    public var internalBytes: UInt64 {
+        internalPages &* pageSize
+    }
+
+    public var appMemoryBytes: UInt64 {
+        internalPages >= purgeablePages ? (internalPages &- purgeablePages) &* pageSize : 0
+    }
+
     /// 可回收字节（free + inactive，对应活动监视器的「可用」）。
     public var reclaimableBytes: UInt64 {
         (freePages &+ inactivePages) &* pageSize
@@ -65,5 +82,6 @@ public struct MemoryStats: Sendable, Equatable, Codable {
     /// 全零占位（读取失败时使用）。
     public static let zero = MemoryStats(pageSize: 0, freePages: 0, activePages: 0,
                                          inactivePages: 0, wiredPages: 0,
-                                         compressedPages: 0, totalBytes: 0)
+                                         compressedPages: 0, purgeablePages: 0,
+                                         internalPages: 0, totalBytes: 0)
 }

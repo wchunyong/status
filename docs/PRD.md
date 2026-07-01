@@ -79,7 +79,7 @@
 - **总量**：`sysctl("hw.memsize")` 取物理内存总量。
 - **口径（明确定义）**：
   - **已用** = 总量 − (free + inactive) × pagesize   （把可回收的 inactive 视为可用，与活动监视器口径对齐）
-  - **明细**：Wired = `wire_count`；Compressed = `compressor_page_count`；App ≈ `active_count`（× pagesize）
+  - **明细**：Wired = `wire_count`；Compressed = `compressor_page_count`；App ≈ (`internal_page_count` − `purgeable_count`)（× pagesize，clamp 到 0）
 - **展示**：状态栏 `12.4G` / `52%`（格式可配）。
 - **验收**：与活动监视器「内存」标签页数值一致（M6 校准）。
 
@@ -371,7 +371,7 @@ func memoryUsage() -> (used: UInt64, total: UInt64) {
     let ps = UInt64(vm_kernel_page_size)
     let reclaimable = (UInt64(stats.free_count) + UInt64(stats.inactive_count)) * ps
     return (used: total - reclaimable, total: total)
-    // 明细：wire_count / compressor_page_count / active_count × ps
+    // 明细：wire_count / compressor_page_count / (internal_page_count - purgeable_count) × ps
 }
 ```
 

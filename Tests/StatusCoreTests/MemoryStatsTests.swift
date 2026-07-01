@@ -25,12 +25,31 @@ final class MemoryStatsTests: XCTestCase {
     func testByteDerivedProperties() {
         let stats = MemoryStats(pageSize: 4096, freePages: 1, activePages: 2,
                                 inactivePages: 3, wiredPages: 4, compressedPages: 5,
+                                purgeablePages: 6, internalPages: 7,
                                 totalBytes: 0)
         XCTAssertEqual(stats.freeBytes, 4096)
         XCTAssertEqual(stats.activeBytes, 8192)
         XCTAssertEqual(stats.inactiveBytes, 12288)
         XCTAssertEqual(stats.wiredBytes, 16384)
         XCTAssertEqual(stats.compressedBytes, 20480)
+        XCTAssertEqual(stats.appMemoryBytes, 4096)
+    }
+
+    func testAppMemoryUsesAnonymousPagesMinusPurgeablePages() {
+        let stats = MemoryStats(pageSize: pageSize, freePages: 0, activePages: 10,
+                                inactivePages: 0, wiredPages: 0, compressedPages: 0,
+                                purgeablePages: 50, internalPages: 1300,
+                                totalBytes: 16 * gb)
+        XCTAssertEqual(stats.activeBytes, 10 * pageSize)
+        XCTAssertEqual(stats.appMemoryBytes, 1250 * pageSize)
+    }
+
+    func testAppMemoryClampsToZeroWhenPurgeableExceedsAnonymous() {
+        let stats = MemoryStats(pageSize: pageSize, freePages: 0, activePages: 0,
+                                inactivePages: 0, wiredPages: 0, compressedPages: 0,
+                                purgeablePages: 20, internalPages: 10,
+                                totalBytes: 16 * gb)
+        XCTAssertEqual(stats.appMemoryBytes, 0)
     }
 
     func testUsedClampsToZeroWhenReclaimableExceedsTotal() {
