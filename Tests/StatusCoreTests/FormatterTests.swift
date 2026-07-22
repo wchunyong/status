@@ -106,14 +106,4 @@ final class FormatterTests: XCTestCase {
         XCTAssertEqual(f.format(fraction: 1.5), "100%")
         XCTAssertEqual(f.format(fraction: -0.2), "0%")
     }
-
-    // MARK: FanDisplayFormatter
-
-    func testFanDisplayFormatterFormatsValuesAndPlaceholders() {
-        let f = FanDisplayFormatter()
-        XCTAssertEqual(f.temperatureString(48.6), "49°C")
-        XCTAssertEqual(f.temperatureString(nil), "--°C")
-        XCTAssertEqual(f.rpmString(1447), "1447R")
-        XCTAssertEqual(f.rpmString(nil), "----R")
-    }
 }

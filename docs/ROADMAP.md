@@ -100,14 +100,14 @@
 | R-019 | `GlassMaterial`：26+ `.glassEffect()` / 回退 `.ultraThinMaterial` | R-018 | ✅ | 编译期 `if #available` 分支；B7 |
 | R-020 | 菜单「⚙ 设置…」「⏻ 退出」入口 | R-016, R-018 | ✅ | 打开设置窗口 / 终止 App |
 
-### Phase 4.5 —— Apple Silicon 风扇 / 温度 🟡
+### Phase 4.5 —— ~~Apple Silicon 风扇 / 温度~~ 🚫 v2.0 移除
 
-| ID | 任务 | 依赖 | 状态 | 验收 / 关联铁律 |
-|----|------|------|------|-----------------|
-| R-027 | Fan 数据模型 / formatter / 设置持久化 | R-012, R-013 | ✅ | 默认系统模式；RPM clamp；旧 JSON 回退；单测覆盖 |
-| R-028 | AppleSMC/HID FanDriver（温度/RPM 读取 + 固定 RPM / 恢复默认） | R-011 | ✅ | Apple Silicon-only；Intel unsupported；SMC/HID 失败占位；B1/B3/B8 |
-| R-029 | 状态栏 / 浮窗 / 设置页接入 Fan | R-014, R-016, R-018, R-027 | ✅ | 状态栏两行 `49°C`/`1400R`；Intel 设置禁用提示 |
-| R-030 | 退出与系统模式恢复 | R-028 | ✅ | App 退出前尝试 `restoreAutomatic()`；固定 RPM 不跨退出残留 |
+| ID | 任务 | 依赖 | 状态 | 说明 |
+|----|------|------|------|------|
+| R-027 | ~~Fan 数据模型 / formatter / 设置持久化~~ | — | 🚫 | macOS 26+ 完全禁止 SMC 访问，移除 |
+| R-028 | ~~AppleSMC/HID FanDriver~~ | — | 🚫 | SMC 写入返回 kIOReturnNotPermitted |
+| R-029 | ~~状态栏 / 浮窗 / 设置页接入 Fan~~ | — | 🚫 | 移除 |
+| R-030 | ~~退出与系统模式恢复~~ | — | 🚫 | 移除 |
 
 ### Phase 5 —— 性能 / 稳定性 / 发布 🟡（阻塞，详见 §6.3）
 
@@ -136,9 +136,7 @@ Phase 2:  R-012 ─▶ R-013 ─▶ R-015 ─▶ R-017
 Phase 3:  R-012 ─▶ R-016 ─▶ R-017
 Phase 4:  R-011 + R-014 ─▶ R-018 ─▶ R-019
           R-016 + R-018 ─▶ R-020
-Phase 4.5: R-012 + R-013 ─▶ R-027
-           R-011 ─▶ R-028 ─▶ R-030
-           R-014 + R-016 + R-018 + R-027 ─▶ R-029
+Phase 4.5: ~~R-027, R-028, R-029, R-030~~ 🚫 v2.0 移除
 Phase 5:  R-011 ─▶ R-021
           R-018 ─▶ R-022, R-023, R-024
           R-001 ─▶ R-025
@@ -155,7 +153,7 @@ Phase 5:  R-011 ─▶ R-021
 | 网络上行 ↑ | ✅ 速率 | ✅ 速率（大号） | 网络：同上 |
 | 内存 | ✅ 已用/百分比 | ✅ 已用·总量 + % + 进度条 + App/Wired/压缩 明细 | 内存：单位 / 格式 |
 | CPU | ✅ 总占用% | ✅ 总占用%（大号）+ 进度条 | CPU：单核显隐（占位） |
-| 风扇 / 温度 | ✅ 平均温度 + RPM | ✅ 平均温度 + RPM | 风扇：系统默认 / 固定 RPM / 恢复默认 |
+| ~~风扇 / 温度~~ | 🚫 v2.0 移除 | 🚫 v2.0 移除 | 🚫 v2.0 移除 |
 | （全局） | 顺序/显隐/紧凑 | — | 显示：顺序(↑↓) / 显隐 / 紧凑 |
 | 设置入口 | — | ✅「⚙ 设置…」 | 通用：自启动 / 刷新间隔 / 外观 |
 | 退出 | — | ✅「⏻ 退出」 | — |
@@ -240,11 +238,21 @@ R-021~R-026 无法在无人工介入下完成，原因：
   - SMAppService 自启动、本地化、图标、签名都**需要正式 .app bundle**——这些落到 M7：届时用 XcodeGen/Xcode 生成 .xcodeproj，做 bundle（LSUIElement/Info.plist/图标/strings）→ 签名 → 公证 → DMG。
   - R-014 状态栏用 `attributedTitle`（见 §3 备注）。
 
-### D7 · 风扇/温度采用 Apple Silicon-only 的 AppleSMC + HID 路径
-- **背景**：用户需要状态栏显示 CPU+GPU 平均温度与风扇 RPM，并支持固定风扇转速 / 恢复系统默认。该能力没有稳定公开高级 API，主流实现依赖 AppleSMC / IOKit；Apple Silicon 上传统 SMC 温度键可能缺失或返回无效值。
-- **决策**：首版只支持 Apple Silicon（`arm64` / `arm64e`）。通过 AppleSMC 读取常见 CPU/GPU 温度键与 `F0Ac` RPM；SMC 温度无效时回退到 HID thermal sensors 的 SoC die 平均温度；固定转速写 `F0Tg` 和 `FS!`；恢复默认写 `FS! = 0`。Intel / 非 arm64 直接禁用设置并提示用户。
-- **备选**：同时支持 Intel SMC 键表——被否，硬件差异大、验证面翻倍；只做只读温度——被否，未满足固定转速需求。
-- **后果**：SMC/HID 读写必须失败安全：不可访问时显示占位、不影响其他指标、退出时尝试恢复系统默认；该功能需要真实 Apple Silicon 机器手动验证温度/RPM/固定转速效果。
+### D7 · 风扇控制移除（2026-07-23 修订）
+
+- **背景**：用户需要在 M4 Mac 上实现风扇固定转速控制。经过完整的诊断分析，发现 macOS 26+ 完全禁止了用户空间 SMC 访问。
+
+- **诊断结果**：
+  - macOS 版本：26.5.2 (Ventura)
+  - 错误码：`kIOReturnNotPermitted` (0xE00002C2)
+  - 所有 SMC 读/写操作都被内核拒绝
+  - Apple Silicon 上 SMC 服务为 `AppleSMCKeysEndpoint`，传统风扇键不存在
+
+- **决策**：**v2.0 移除风扇控制功能**，保持网络/内存/CPU 三大核心功能。
+
+- **备选**：实现系统扩展（System Extension/DriverKit）——需要用户手动授权、特殊 entitlement 和 Apple 签名，复杂度高，暂不实现。
+
+- **后果**：Phase 4.5 任务全部标记为已移除，代码中风扇相关模块移除，仅保留三大监控功能。
 
 ---
 

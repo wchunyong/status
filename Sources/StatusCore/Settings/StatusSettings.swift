@@ -25,17 +25,12 @@ public enum CPUFormat: String, CaseIterable, Codable, Sendable {
     case totalPercent // 38%
 }
 
-public enum FanControlMode: String, CaseIterable, Codable, Sendable {
-    case system
-    case fixedRPM
-}
-
 public enum AppearanceMode: String, CaseIterable, Codable, Sendable {
     case system, light, dark
 }
 
 public enum StatusItem: String, CaseIterable, Codable, Sendable {
-    case network, memory, cpu, fan
+    case network, memory, cpu
 }
 
 /// 全部可配置项（对应 PRD §5.2 设置五 Tab）。Codable + 字段级默认值，
@@ -48,9 +43,7 @@ public struct StatusSettings: Codable, Equatable, Sendable {
     public var memoryFormat: MemoryFormat = .usedOfTotal
     public var cpuFormat: CPUFormat = .totalPercent
     public var showCPUPerCore: Bool = false
-    public var fanControlMode: FanControlMode = .system
-    public var fanFixedRPM: Int = 1400
-    public var itemOrder: [StatusItem] = [.network, .memory, .cpu, .fan]
+    public var itemOrder: [StatusItem] = [.network, .memory, .cpu]
     public var hiddenItems: Set<StatusItem> = []
     public var compactMode: Bool = false
     public var launchAtLogin: Bool = false
@@ -61,7 +54,6 @@ public struct StatusSettings: Codable, Equatable, Sendable {
     private enum CodingKeys: String, CodingKey {
         case refreshIntervalSeconds, networkUnit, showNetworkArrows
         case memoryUnit, memoryFormat, cpuFormat, showCPUPerCore
-        case fanControlMode, fanFixedRPM
         case itemOrder, hiddenItems, compactMode, launchAtLogin, appearance
     }
 
@@ -75,8 +67,6 @@ public struct StatusSettings: Codable, Equatable, Sendable {
         memoryFormat = try c.decodeIfPresent(MemoryFormat.self, forKey: .memoryFormat) ?? memoryFormat
         cpuFormat = try c.decodeIfPresent(CPUFormat.self, forKey: .cpuFormat) ?? cpuFormat
         showCPUPerCore = try c.decodeIfPresent(Bool.self, forKey: .showCPUPerCore) ?? showCPUPerCore
-        fanControlMode = try c.decodeIfPresent(FanControlMode.self, forKey: .fanControlMode) ?? fanControlMode
-        fanFixedRPM = try FanRPMPolicy.clamp(c.decodeIfPresent(Int.self, forKey: .fanFixedRPM) ?? fanFixedRPM)
         itemOrder = try c.decodeIfPresent([StatusItem].self, forKey: .itemOrder) ?? itemOrder
         itemOrder = Self.normalizedItemOrder(itemOrder)
         hiddenItems = try c.decodeIfPresent(Set<StatusItem>.self, forKey: .hiddenItems) ?? hiddenItems

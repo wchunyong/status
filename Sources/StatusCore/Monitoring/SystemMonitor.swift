@@ -8,12 +8,8 @@ public actor SystemMonitor {
     private var prevCPUTicks: [CPUTicks]?
     private var prevNetwork: NetworkCounters?
     private var prevMonotonic: Double?
-    private var settings = StatusSettings()
-    private let fanController: FanController
 
-    public init(fanController: FanController = FanController(driver: SMCFanDriver.makeDefault())) {
-        self.fanController = fanController
-    }
+    public init() {}
 
     /// 采集一次，返回显示快照。
     /// 首次调用只建立基线：CPU 返回 0，网络返回 0 速率（无前值可做差）。
@@ -43,17 +39,7 @@ public actor SystemMonitor {
         prevNetwork = network
         prevMonotonic = now
 
-        let fanStatus = fanController.sample(settings: settings)
-
-        return Sample(cpuFraction: cpuFraction, memory: memory, networkRate: rate, fanStatus: fanStatus)
-    }
-
-    public func updateSettings(_ settings: StatusSettings) {
-        self.settings = settings
-    }
-
-    public func restoreFanAutomatic() {
-        fanController.restoreAutomatic()
+        return Sample(cpuFraction: cpuFraction, memory: memory, networkRate: rate)
     }
 
     /// 睡眠唤醒后重置基线（B4）：丢弃下一次差值，避免速率尖峰。

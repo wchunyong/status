@@ -25,10 +25,6 @@ struct DetailPanelView: View {
             memoryCard
             divider
             cpuCard
-            if sample?.fanStatus.isSupported ?? AppleSiliconSupport.isSupported() {
-                divider
-                fanCard
-            }
             divider
             footer
         }
@@ -96,14 +92,6 @@ struct DetailPanelView: View {
         }
     }
 
-    private func textChip(_ key: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 1) {
-            Text(key).font(.system(size: 9)).foregroundStyle(.secondary)
-            Text(value)
-                .font(.system(size: 11, weight: .medium).monospacedDigit())
-        }
-    }
-
     // MARK: CPU
 
     private var cpuCard: some View {
@@ -115,26 +103,6 @@ struct DetailPanelView: View {
                     .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
             }
             progressBar(sample?.cpuFraction ?? 0)
-        }
-    }
-
-    // MARK: 风扇
-
-    private var fanCard: some View {
-        let status = sample?.fanStatus ?? .unavailable
-        let formatter = FanDisplayFormatter()
-        return VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                header("风扇")
-                Spacer()
-                Text(formatter.temperatureString(status.averageTemperatureCelsius))
-                    .font(.system(size: 15, weight: .semibold, design: .rounded).monospacedDigit())
-            }
-            HStack(spacing: 16) {
-                textChip("平均温度", formatter.temperatureString(status.averageTemperatureCelsius))
-                textChip("转速", formatter.rpmString(status.fanRPM))
-                Spacer()
-            }
         }
     }
 

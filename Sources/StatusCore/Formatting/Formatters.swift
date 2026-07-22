@@ -151,19 +151,3 @@ public struct PercentFormatter: Sendable {
         return String(format: "%.\(decimals)f%%", clamped * 100)
     }
 }
-
-// MARK: - 风扇状态栏显示
-
-public struct FanDisplayFormatter: Sendable {
-    public init() {}
-
-    public func temperatureString(_ value: Double?) -> String {
-        guard let value else { return "--°C" }
-        return "\(Int(value.rounded()))°C"
-    }
-
-    public func rpmString(_ value: Int?) -> String {
-        guard let value else { return "----R" }
-        return "\(value)R"
-    }
-}

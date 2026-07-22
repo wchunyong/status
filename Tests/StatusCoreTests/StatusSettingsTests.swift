@@ -9,12 +9,9 @@ final class StatusSettingsTests: XCTestCase {
         XCTAssertTrue(s.showNetworkArrows)
         XCTAssertEqual(s.memoryFormat, .usedOfTotal)
         XCTAssertEqual(s.cpuFormat, .totalPercent)
-        XCTAssertEqual(s.itemOrder, [.network, .memory, .cpu, .fan])
-        XCTAssertEqual(s.fanControlMode, .system)
-        XCTAssertEqual(s.fanFixedRPM, 1400)
+        XCTAssertEqual(s.itemOrder, [.network, .memory, .cpu])
         XCTAssertTrue(s.hiddenItems.isEmpty)
         XCTAssertTrue(s.isVisible(.cpu))
-        XCTAssertTrue(s.isVisible(.fan))
     }
 
     func testHiddenItemsAffectsVisibility() {
@@ -37,8 +34,6 @@ final class StatusSettingsTests: XCTestCase {
         s.networkUnit = .mbs
         s.memoryFormat = .percent
         s.refreshIntervalSeconds = 5
-        s.fanControlMode = .fixedRPM
-        s.fanFixedRPM = 2400
         s.hiddenItems = [.cpu]
         store.save(s)
 
@@ -46,8 +41,6 @@ final class StatusSettingsTests: XCTestCase {
         XCTAssertEqual(loaded.networkUnit, .mbs)
         XCTAssertEqual(loaded.memoryFormat, .percent)
         XCTAssertEqual(loaded.refreshIntervalSeconds, 5)
-        XCTAssertEqual(loaded.fanControlMode, .fixedRPM)
-        XCTAssertEqual(loaded.fanFixedRPM, 2400)
         XCTAssertFalse(loaded.isVisible(.cpu))
     }
 
@@ -76,17 +69,6 @@ final class StatusSettingsTests: XCTestCase {
         XCTAssertEqual(decoded?.showNetworkArrows, false)
         XCTAssertEqual(decoded?.networkUnit, .auto)
         XCTAssertEqual(decoded?.memoryFormat, .usedOfTotal)
-        XCTAssertEqual(decoded?.fanControlMode, .system)
-        XCTAssertEqual(decoded?.fanFixedRPM, 1400)
-    }
-
-    func testOldItemOrderAppendsNewFanItem() {
-        let json = Data("""
-        {"itemOrder": ["network", "memory", "cpu"]}
-        """.utf8)
-        let decoded = try? JSONDecoder().decode(StatusSettings.self, from: json)
-        XCTAssertEqual(decoded?.itemOrder, [.network, .memory, .cpu, .fan])
-        XCTAssertTrue(decoded?.isVisible(.fan) ?? false)
     }
 
     func testCorruptDataFallsBackToDefaults() throws {
