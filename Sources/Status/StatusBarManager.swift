@@ -22,6 +22,7 @@ final class StatusBarManager: NSObject {
     private let statusBarView: StatusBarItemView
     private let settingsModel: SettingsModel
     private let monitorModel: MonitorModel
+    private let powerControllerViewModel: PowerControllerViewModel
     private var detailPanel: NSPanel?
     private var localEventMonitor: Any?
     private var globalEventMonitor: Any?
@@ -29,6 +30,7 @@ final class StatusBarManager: NSObject {
     init(settingsModel: SettingsModel, monitorModel: MonitorModel) {
         self.settingsModel = settingsModel
         self.monitorModel = monitorModel
+        self.powerControllerViewModel = PowerControllerViewModel(settings: settingsModel)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusBarView = StatusBarItemView(monitor: monitorModel, settings: settingsModel)
         super.init()
@@ -51,6 +53,7 @@ final class StatusBarManager: NSObject {
         let panel = DetailPanelView(
             monitor: monitorModel,
             settings: settingsModel,
+            powerController: powerControllerViewModel,
             onOpenSettings: { [weak self] in
                 self?.closePopover()
                 self?.onOpenSettings?()

@@ -11,6 +11,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var sampler: Sampler?
     private var statusBar: StatusBarManager?
     private var settingsWindowController: SettingsWindowController?
+    private var refreshIntervalObserver: AnyCancellable?
 
     func applicationDidFinishLaunching(_: Notification) {
         // 状态栏 + 下拉浮窗
@@ -26,8 +27,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         statusBar = bar
 
-        // 采样调度：后台采集，写入 monitorModel（B8）；状态栏与浮窗都绑定它，随 1s 自动刷新
-        let interval = settingsModel.value.refreshIntervalSeconds
+        // 创建采样器
+        startSampler(interval: settingsModel.value.refreshIntervalSeconds)
+
+        // 监听刷新间隔变化
+        refreshIntervalObserver = settingsModel.$value
+            .map(\.refreshIntervalSeconds)
+            .removeDuplicates()
+            .sink { [weak self] interval in
+                self?.updateSamplerInterval(interval)
+            }
+
+        // B4：监听系统唤醒，重置采集基线，丢弃下一次差值
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self, selector: #selector(didWake),
+            name: NSWorkspace.didWakeNotification, object: nil
+        )
+    }
+
+    private func startSampler(interval: TimeInterval) {
         let model = monitorModel
         let mon = monitor
         let sampler = Sampler(interval: interval, monitor: mon) { [weak model] sample in
@@ -37,16 +55,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         sampler.start()
         self.sampler = sampler
+    }
 
-        // B4：监听系统唤醒，重置采集基线，丢弃下一次差值
-        NSWorkspace.shared.notificationCenter.addObserver(
-            self, selector: #selector(didWake),
-            name: NSWorkspace.didWakeNotification, object: nil
-        )
+    private func updateSamplerInterval(_ interval: TimeInterval) {
+        sampler?.stop()
+        startSampler(interval: interval)
     }
 
     func applicationWillTerminate(_: Notification) {
         sampler?.stop()
+        refreshIntervalObserver?.cancel()
         NSWorkspace.shared.notificationCenter.removeObserver(self)
     }
 

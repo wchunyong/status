@@ -22,6 +22,11 @@ struct StatusBarItemContent: View {
         static let secondaryFontSize: CGFloat = 7.5
         static let networkFontSize: CGFloat = 8.5
         static let arrowFontSize: CGFloat = 7.5
+        // 紧凑模式尺寸
+        static let compactPrimaryFontSize: CGFloat = 8.0
+        static let compactSecondaryFontSize: CGFloat = 6.5
+        static let compactNetworkFontSize: CGFloat = 7.0
+        static let compactPercentWidth: CGFloat = 26
     }
 
     private var sample: Sample? {
@@ -68,30 +73,40 @@ struct StatusBarItemContent: View {
     }
 
     private func rateRow(symbol: String, bps: Double) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: Layout.arrowTextSpacing) {
-            Text(symbol)
-                .font(.system(size: Layout.arrowFontSize, weight: .regular))
-                .frame(width: Layout.arrowWidth, alignment: .center)
+        let fontSize = s.compactMode ? Layout.compactNetworkFontSize : Layout.networkFontSize
+        let arrowFontSize = s.compactMode ? Layout.arrowFontSize * 0.85 : Layout.arrowFontSize
+
+        return HStack(alignment: .firstTextBaseline, spacing: Layout.arrowTextSpacing) {
+            // 显示方向箭头（根据设置）
+            if s.showNetworkArrows {
+                Text(symbol)
+                    .font(.system(size: arrowFontSize, weight: .regular))
+                    .frame(width: Layout.arrowWidth, alignment: .center)
+            }
             Text(StatusBarByteRateFormatter(unit: s.networkUnit).format(bytesPerSecond: bps))
-                .font(.system(size: Layout.networkFontSize, weight: .medium))
+                .font(.system(size: fontSize, weight: .medium))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
         }
-        .padding(.leading, Layout.networkLeadingInset)
+        .padding(.leading, s.showNetworkArrows ? Layout.networkLeadingInset : 0)
     }
 
     private func percentModule(_ fraction: Double, label: String) -> some View {
-        VStack(spacing: Layout.rowSpacing) {
+        let primarySize = s.compactMode ? Layout.compactPrimaryFontSize : Layout.primaryFontSize
+        let secondarySize = s.compactMode ? Layout.compactSecondaryFontSize : Layout.secondaryFontSize
+        let width = s.compactMode ? Layout.compactPercentWidth : Layout.percentWidth
+
+        return VStack(spacing: Layout.rowSpacing) {
             Text("\(Int((fraction * 100).rounded()))%")
-                .font(.system(size: Layout.primaryFontSize, weight: .semibold))
+                .font(.system(size: primarySize, weight: .semibold))
                 .monospacedDigit()
                 .lineLimit(1)
                 .minimumScaleFactor(0.9)
             Text(label)
-                .font(.system(size: Layout.secondaryFontSize, weight: .bold))
+                .font(.system(size: secondarySize, weight: .bold))
                 .lineLimit(1)
         }
-        .frame(width: Layout.percentWidth)
+        .frame(width: width)
     }
 }
