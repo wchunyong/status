@@ -7,7 +7,7 @@ import Foundation
 public final class PowerController: @unchecked Sendable {
     private let lock = NSLock()
     private var _isEnabled = false
-    private var process: Process?
+    private var caffeinatePID: pid_t?
 
     /// 当前是否已启用屏幕常亮
     public var isEnabled: Bool {
@@ -40,33 +40,24 @@ public final class PowerController: @unchecked Sendable {
     private func enableCaffeinate() {
         disableCaffeinate()
 
-        let process = Process()
-        process.executableURL = URL(fileURLWithPath: "/usr/bin/caffeinate")
-        process.arguments = ["-d"]
-        process.qualityOfService = .userInitiated
-
-        do {
-            try process.run()
-            self.process = process
-        } catch {
-            print("[PowerController] Failed to start caffeinate: \(error)")
+        var pid: pid_t = 0
+        var args: [UnsafeMutablePointer<CChar>?] = [
+            strdup("/usr/bin/caffeinate"),
+            strdup("-d"),
+            nil,
+        ]
+        let result = posix_spawn(&pid, "/usr/bin/caffeinate", nil, nil, &args, environ)
+        args.dropFirst().forEach { free($0) }
+        if result == 0 {
+            caffeinatePID = pid
         }
     }
 
     private func disableCaffeinate() {
-        if let process = process {
-            if process.isRunning {
-                process.terminate()
-            }
-            self.process = nil
+        if let pid = caffeinatePID {
+            kill(pid, SIGTERM)
+            caffeinatePID = nil
         }
-
-        // 也尝试终止任何剩余的 caffeinate -d 进程
-        let killer = Process()
-        killer.executableURL = URL(fileURLWithPath: "/usr/bin/pkill")
-        killer.arguments = ["-f", "caffeinate.*-d"]
-        killer.qualityOfService = .utility
-        try? killer.run()
     }
 
     deinit {

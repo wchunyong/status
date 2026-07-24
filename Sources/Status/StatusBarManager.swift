@@ -30,7 +30,7 @@ final class StatusBarManager: NSObject {
     init(settingsModel: SettingsModel, monitorModel: MonitorModel) {
         self.settingsModel = settingsModel
         self.monitorModel = monitorModel
-        self.powerControllerViewModel = PowerControllerViewModel(settings: settingsModel)
+        powerControllerViewModel = PowerControllerViewModel(settings: settingsModel)
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         statusBarView = StatusBarItemView(monitor: monitorModel, settings: settingsModel)
         super.init()
