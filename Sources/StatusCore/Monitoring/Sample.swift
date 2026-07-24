@@ -6,8 +6,7 @@ public struct Sample: Sendable, Equatable, Codable {
     public let memory: MemoryStats
     public let networkRate: NetworkRate
 
-    public init(cpuFraction: Double, memory: MemoryStats, networkRate: NetworkRate)
-    {
+    public init(cpuFraction: Double, memory: MemoryStats, networkRate: NetworkRate) {
         self.cpuFraction = cpuFraction
         self.memory = memory
         self.networkRate = networkRate

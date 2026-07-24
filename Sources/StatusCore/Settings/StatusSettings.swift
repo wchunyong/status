@@ -48,6 +48,7 @@ public struct StatusSettings: Codable, Equatable, Sendable {
     public var compactMode: Bool = false
     public var launchAtLogin: Bool = false
     public var appearance: AppearanceMode = .system
+    public var screenAlwaysOn: Bool = false // 屏幕常亮
 
     public init() {}
 
@@ -55,6 +56,7 @@ public struct StatusSettings: Codable, Equatable, Sendable {
         case refreshIntervalSeconds, networkUnit, showNetworkArrows
         case memoryUnit, memoryFormat, cpuFormat, showCPUPerCore
         case itemOrder, hiddenItems, compactMode, launchAtLogin, appearance
+        case screenAlwaysOn
     }
 
     public init(from decoder: Decoder) throws {
@@ -73,6 +75,7 @@ public struct StatusSettings: Codable, Equatable, Sendable {
         compactMode = try c.decodeIfPresent(Bool.self, forKey: .compactMode) ?? compactMode
         launchAtLogin = try c.decodeIfPresent(Bool.self, forKey: .launchAtLogin) ?? launchAtLogin
         appearance = try c.decodeIfPresent(AppearanceMode.self, forKey: .appearance) ?? appearance
+        screenAlwaysOn = try c.decodeIfPresent(Bool.self, forKey: .screenAlwaysOn) ?? screenAlwaysOn
     }
 
     /// 某项是否在状态栏显示。

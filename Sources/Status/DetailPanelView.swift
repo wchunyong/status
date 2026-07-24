@@ -7,6 +7,7 @@ import SwiftUI
 struct DetailPanelView: View {
     @ObservedObject var monitor: MonitorModel
     @ObservedObject var settings: SettingsModel
+    @ObservedObject var powerController: PowerControllerViewModel
     let onOpenSettings: () -> Void
     let onQuit: () -> Void
 
@@ -25,6 +26,8 @@ struct DetailPanelView: View {
             memoryCard
             divider
             cpuCard
+            divider
+            powerCard
             divider
             footer
         }
@@ -104,6 +107,43 @@ struct DetailPanelView: View {
             }
             progressBar(sample?.cpuFraction ?? 0)
         }
+    }
+
+    // MARK: 快捷控制
+
+    private var powerCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            header("快捷控制")
+            HStack(spacing: 12) {
+                powerButton(
+                    icon: "sun.max.fill",
+                    label: "常亮",
+                    isActive: powerController.isScreenAlwaysOnActive
+                ) {
+                    powerController.toggleScreenAlwaysOn()
+                }
+                Spacer()
+            }
+        }
+    }
+
+    private func powerButton(icon: String, label: String, isActive: Bool, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            VStack(spacing: 4) {
+                Image(systemName: icon)
+                    .font(.system(size: 16))
+                    .foregroundStyle(isActive ? .orange : .secondary)
+                Text(label)
+                    .font(.system(size: 9))
+                    .foregroundStyle(.secondary)
+            }
+            .frame(width: 50, height: 50)
+            .background(
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isActive ? Color.orange.opacity(0.15) : Color.secondary.opacity(0.1))
+            )
+        }
+        .buttonStyle(.plain)
     }
 
     // MARK: 复用组件
