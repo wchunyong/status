@@ -1,7 +1,8 @@
 import StatusCore
 import SwiftUI
 
-/// 主设置界面（PRD §5.2 四 Tab）。绑定 SettingsModel，改动经 onChange → persist() 写回并实时生效。
+/// 主设置界面（PRD §5.2 四 Tab）。绑定 SettingsModel，改动经 `SettingsModel` 的
+/// `$value` 订阅自动 `persist()` 落盘并实时生效（持久化是 SettingsModel 的不变式）。
 struct SettingsView: View {
     @ObservedObject var model: SettingsModel
 
@@ -14,7 +15,6 @@ struct SettingsView: View {
             display.tabItem { Label("显示", systemImage: "rectangle.3.group") }
         }
         .frame(width: 500, height: 380)
-        .onChange(of: model.value) { _, _ in model.persist() }
     }
 
     // MARK: 通用
