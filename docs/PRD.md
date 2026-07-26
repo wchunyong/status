@@ -41,7 +41,7 @@
 
 1. **原生优先**：系统框架（Mach / IOKit / SystemConfiguration / SwiftUI / AppKit），零重型三方依赖。
 2. **按需工作**：单一低频采样定时器 + Timer Coalescing，最大化电量友好。
-3. **零泄漏**：Mach 端口、`getifaddrs` 内存、CF 对象严格配对释放；睡眠/唤醒边界专门处理。
+3. **零泄漏**：Mach 端口（`mach_host_self` 的 send right）、`host_processor_info` 分配、子进程（`waitpid`）、CF 对象严格配对释放；睡眠/唤醒边界专门处理。
 4. **可读至上**：状态栏紧凑高对比，自动适配浅/深色与刘海屏。
 5. **渐进增强**：核心监控在 macOS 14+ 全可用，新视觉按系统版本优雅启用。
 
@@ -67,10 +67,10 @@
 ### 5.1 核心监控（MVP）
 
 #### F1 网络速率
-- **采集**：`getifaddrs()` 枚举接口，仅取 `AF_LINK` 项，读 `if_data` 的 `ifi_ibytes` / `ifi_obytes`；排除环回 `lo0` 与 down 接口。
+- **采集**：`sysctl(NET_RT_IFLIST2)` 一次性枚举接口，逐条解析 `if_msghdr2`，读 `if_data64` 的 `ifi_ibytes` / `ifi_obytes`（原生 64 位，无 4GB 回绕）；聚合时仅取 `IFF_UP` 且非 `IFF_LOOPBACK` 的接口（排除环回 `lo0` 与 down 接口）。
 - **聚合**：默认汇总所有「UP 且非环回」的物理接口（`en*` / `bridge*` / `utun*` 等）；可在设置中限定。
 - **速率**：与上次采样的累计字节求差，除以**单调时钟**真实间隔（`clock_gettime(CLOCK_MONOTONIC)`），规避休眠导致的大 Δ。
-- **回绕处理**：`ifi_ibytes` 类型用 64 位累加；若检测到计数回落（接口重置），丢弃该次差值。
+- **回绕处理**：`if_data64` 计数为 64 位；若检测到累计回落（接口重置），丢弃该次差值（B4）。
 - **展示**：状态栏 `↓5.2 ↑0.3 MB/s`。
 - **验收**：与 `nettop` / 活动监视器误差 < 5%；唤醒后无尖峰。
 
@@ -161,7 +161,7 @@
 | 菜单 | `NSMenu` + 自定义 view 的 `NSMenuItem` | 14+ |
 | 设置窗口 | SwiftUI | 14+ |
 | 视觉材质 | `.glassEffect()`（26+）/ `.ultraThinMaterial` 回退 | `if #available(macOS 26)` |
-| 数据采集 | Mach Kernel API + `getifaddrs` + `sysctl` | 14+ |
+| 数据采集 | Mach Kernel API + `sysctl`（`NET_RT_IFLIST2` 网络 / `hw.memsize` 总量） | 14+ |
 | 自启动 | `SMAppService.mainApp` | 13+ |
 | 持久化 | `@AppStorage` / `UserDefaults` | 14+ |
 | 包管理 | Swift Package Manager（首发零三方依赖） | — |
@@ -177,7 +177,7 @@ Status (App)
 │   ├── SystemMonitor (actor)              # 持有各 Provider，统一取样
 │   ├── CPUProvider        (Mach)
 │   ├── MemoryProvider     (Mach + sysctl)
-│   ├── NetworkProvider    (getifaddrs)
+│   ├── NetworkProvider    (sysctl NET_RT_IFLIST2)
 │   ├── FanController      (AppleSMC + HID thermal / IOKit, Apple Silicon-only)
 │   ├── Sampler                          # 单一定时器，utility QoS，coalesce
 │   └── Sample (Sendable)                # 一次采样的不可变快照
@@ -222,10 +222,11 @@ StatusBarManager (@MainActor)
 2. **单调时钟计时**：`clock_gettime(CLOCK_MONOTONIC)`，避免系统休眠大 Δ；检测到 Δ 异常（如 > 10s）则丢弃本次差值。
 3. **睡眠/唤醒**：监听 `NSWorkspace.didWakeNotification`，唤醒后丢弃下一次采样，重置 Provider 缓存。
 4. **零泄漏**：
-   - `getifaddrs` → `freeifaddrs`；
+   - `mach_host_self()` 的 send right → `mach_port_deallocate`；
    - `host_processor_info` 返回的指针 → `vm_deallocate`；
-   - 所有路径用 `defer` 兜底；
-   - AppleSMC 连接退出时 `IOServiceClose`。
+   - 网络走 `sysctl` + Swift 管理的 `[UInt8]` 缓冲（旧 `getifaddrs`/`freeifaddrs` 路径已弃用，见 ROADMAP §7）；
+   - 子进程（caffeinate 等）→ `waitpid` 收尸；
+   - 所有路径用 `defer` 兜底。
 5. **渲染节流**：状态栏 `NSView` 仅在 `Sample` 实际变化时 `setNeedsDisplay`；菜单非打开态不刷新视图。
 6. **接口热插拔**：网卡消失时丢弃其缓存计数，再现时重新基线；全程不崩溃。
 7. **回绕保护**：网络计数回落判定为接口重置，丢弃本次 Δ。
@@ -333,28 +334,16 @@ StatusBarManager (@MainActor)
 
 ## 附录 A：关键 API 与参考实现（草案，实现时细化）
 
-### A.1 网络（getifaddrs）
-```swift
-func networkBytes() -> (in: UInt64, out: UInt64) {
-    var first: UnsafeMutablePointer<ifaddrs>?
-    guard getifaddrs(&first) == 0, let head = first else { return (0, 0) }
-    defer { freeifaddrs(first) }
-    var bin: UInt64 = 0, bout: UInt64 = 0
-    var cur: UnsafeMutablePointer<ifaddrs>? = head
-    while let p = cur {
-        let a = p.pointee
-        if a.ifa_addr?.pointee.sa_family == sa_family_t(AF_LINK),
-           let data = a.ifa_data,
-           Self.isPhysicalAndUp(a) {              // 排除 lo0 / down
-            let ifd = data.load(as: if_data.self)
-            bin  &+= UInt64(ifd.ifi_ibytes)
-            bout &+= UInt64(ifd.ifi_obytes)
-        }
-        cur = a.ifa_next
-    }
-    return (bin, bout)   // 与上次累计值求差 → 除以单调时钟 Δ → 速率
-}
-```
+### A.1 网络（sysctl `NET_RT_IFLIST2`）
+
+> 权威实现：`Sources/StatusCore/Monitoring/SystemReaders.swift` → `NetworkSnapshotReader.read()`。
+
+要点（决策见 ROADMAP §7；口径见 B2）：
+- `sysctl(NET_RT_IFLIST2)` 一次性拿到全部接口的 `if_msghdr2` 列表；
+- 逐条解析，取 `ifm_data.ifi_ibytes` / `ifi_obytes`（`if_data64` 原生 64 位，无 4GB 回绕）；
+- 仅聚合 `IFF_UP` 且非 `IFF_LOOPBACK` 的接口（排除 `lo0` 与 down）；
+- 缓冲用 Swift 管理的 `[UInt8]`，无需手动释放（B1）；
+- 与上次累计值求差，除以单调时钟 Δ 得速率（B4/B5）。
 
 ### A.2 内存（host_statistics64）
 ```swift

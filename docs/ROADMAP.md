@@ -45,7 +45,7 @@
 | **Phase 1** | 采集核心（CPU/Mem/Net + Sampler + 防泄漏） | ✅ 完成（R-006~R-011） |
 | **Phase 2** | 状态栏实时显示 + 格式化 | ✅ 完成（R-012~R-015） |
 | **Phase 3** | 设置界面（五 Tab） | ✅ 完成（R-016~R-017） |
-| **Phase 4** | 菜单详情 + 液态玻璃 | ✅ 完成（R-018~R-020） |
+| **Phase 4** | 菜单详情 + 浮窗 + 设置/退出入口（液态玻璃材质待定） | 🟡 部分完成（R-018 ✅ / R-019 ❌ 未实现 / R-020 ✅） |
 | **Phase 4.5** | Apple Silicon 风扇/温度监控与固定转速 | 🟡 进行中（R-027~R-030） |
 | **Phase 5** | 性能 / 稳定性 / 发布 | 🟡 阻塞：需签名证书 / 24h 老化 / 可视化 QA / .app bundle（见 §6.3） |
 
@@ -92,12 +92,12 @@
 | R-016 | `SettingsView`（SwiftUI）五 Tab：通用/网络/内存/CPU/显示 | R-012 | ✅ | 全部 §5.2 配置项可编辑；14+ 可用 |
 | R-017 | 设置变更实时反映状态栏 + 外观应用 | R-016, R-015 | ✅ | `onChange → persist()` 联动；外观即时切换 |
 
-### Phase 4 —— 菜单详情 + 液态玻璃 ✅
+### Phase 4 —— 菜单详情 + 浮窗 + 设置/退出入口（液态玻璃材质待定）
 
 | ID | 任务 | 依赖 | 状态 | 验收 / 关联铁律 |
 |----|------|------|------|-----------------|
 | R-018 | `NSPopover` + `DetailPanelView`（网络/内存/CPU 卡片 + 进度条 + breakdown，绑定 MonitorModel 1s 刷新） | R-011, R-014 | ✅ | 点击弹浮窗，明细更详细；D4 修订 |
-| R-019 | `GlassMaterial`：26+ `.glassEffect()` / 回退 `.ultraThinMaterial` | R-018 | ✅ | 编译期 `if #available` 分支；B7 |
+| R-019 | `GlassMaterial`：26+ `.glassEffect()` / 回退 `.ultraThinMaterial` | R-018 | ❌ | Phase 4 窗口/浮窗材质未实现（`DetailPanelView` 用 `.regularMaterial`）；app 图标已做；待产品侧决策是否继续 |
 | R-020 | 菜单「⚙ 设置…」「⏻ 退出」入口 | R-016, R-018 | ✅ | 打开设置窗口 / 终止 App |
 
 ### Phase 4.5 —— ~~Apple Silicon 风扇 / 温度~~ 🚫 v2.0 移除

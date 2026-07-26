@@ -35,7 +35,7 @@
 - **菜单**：`NSMenu` + 自定义 `NSView` 的 `NSMenuItem`（详见 D4）。
 - **设置窗口**：SwiftUI（`@AppStorage` 持久化）。
 - **视觉材质**：`.glassEffect()`（macOS 26+）经 `GlassMaterial` 封装，旧系统回退 `.ultraThinMaterial`（详见 B7）。
-- **数据采集**：Mach Kernel API（CPU `host_processor_info`、内存 `host_statistics64`）+ `getifaddrs`（网络）+ `sysctl`（`hw.memsize`）。**禁止引入第三方监控库**。
+- **数据采集**：Mach Kernel API（CPU `host_processor_info`、内存 `host_statistics64`）+ `sysctl NET_RT_IFLIST2`（网络，原生 64 位 `if_data64` 计数，无 4GB 回绕）+ `ProcessInfo.processInfo.physicalMemory`（总量，等价 `sysctl hw.memsize`）。**禁止引入第三方监控库**。网络为何不用 `getifaddrs` 见 ROADMAP §7（实现改进，口径 B2 不变）。
 - **自启动**：`SMAppService.mainApp`（macOS 13+）。
 - **时间**：`clock_gettime(CLOCK_MONOTONIC)`（详见 B5）。
 - **持久化**：`UserDefaults` / `@AppStorage`，配置量小，不引入数据库。
@@ -62,7 +62,7 @@ macOS 桌面 App 没有 backend 的 `MODE=debug|prod` 切换，但有以下必�
 
 > 这些是不可违反的不变式，等同 PRD 的核心约束；流程与 review 一律引用 B 编号。
 
-- **B1 零泄漏**：所有 Mach 分配必须配对释放——`host_processor_info` 返回的指针必须 `vm_deallocate`，`getifaddrs` 必须 `freeifaddrs`，全部走 `defer` 兜底。任何新增的系统句柄同样必须有释放路径。24h 内存增长 < 5 MB（PRD §7.2）。
+- **B1 零泄漏**：所有 Mach 分配与系统句柄必须配对释放——`host_processor_info` 返回的指针 `vm_deallocate`、`mach_host_self()` 的 send right `mach_port_deallocate`、posix_spawn 的子进程 `waitpid` 收尸、argv 字符串 `free`，全部走 `defer` 兜底。网络采集用 `sysctl` + Swift 管理的 `[UInt8]` 缓冲（无需手动释放；非旧版 `getifaddrs`/`freeifaddrs` 路径）。任何新增的系统句柄同样必须有释放路径。24h 内存增长 < 5 MB（PRD §7.2）。
 - **B2 数据口径固定**：
   - 内存「已用」= `hw.memsize − (free_count + inactive_count) × pagesize`；
   - CPU 占用 = `busyΔ / totalΔ × 100`，`busyΔ = (user+system+nice)Δ`，`totalΔ` 含 idle；
@@ -187,7 +187,7 @@ PRD §4 Decision Log 与 ROADMAP §7 ADR 共享 D 编号：**ROADMAP §7 为权�
 - 验收标准是否被自动化测试覆盖，而非只靠手测或口头描述；UI 部分手动项是否列入 checklist。
 - 是否选对测试层级，避免把本该单元测试覆盖的口径塞进手动验证。
 - 口径（B2）是否与 PRD §5.1 一致；算 Δ 是否用单调时钟（B5）。
-- 释放（B1）是否完整：Mach 指针、`getifaddrs`、任何新句柄。
+- 释放（B1）是否完整：Mach 指针（`vm_deallocate`）、`mach_host_self` 的 send right（`mach_port_deallocate`）、子进程（`waitpid`）、argv 字符串（`free`）、任何新句柄。
 - 并发（B8）是否正确：UI 在主线程、采集在后台、跨线程经 `Sendable`。
 - 可用性（B7）：26+ 新 API 是否 `if #available` 包裹、是否有 14+ 回退。
 - 隐私（B6）：是否引入网络/分析依赖、是否新增非必要权限。
