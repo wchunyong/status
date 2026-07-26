@@ -12,13 +12,17 @@ public enum CPUSnapshotReader {
         var cpuLoad: UnsafeMutablePointer<integer_t>?
         var count: mach_msg_type_number_t = 0
         let host = mach_host_self()
+        // B1：host_processor_info 的内核分配 + mach_host_self 的 send right 都必须配对释放，
+        // 放在 guard 之前保证成功/失败两条路径都不泄漏。
+        defer {
+            if let p = cpuLoad {
+                let size = vm_size_t(count) * vm_size_t(MemoryLayout<integer_t>.stride)
+                vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: p)), size)
+            }
+            mach_port_deallocate(mach_task_self_, host)
+        }
         let result = host_processor_info(host, PROCESSOR_CPU_LOAD_INFO, &numCPU, &cpuLoad, &count)
         guard result == KERN_SUCCESS, let info = cpuLoad, numCPU > 0 else { return nil }
-        // B1：Mach 分配的内存必须释放，否则每次采样都泄漏。
-        defer {
-            let size = vm_size_t(count) * vm_size_t(MemoryLayout<integer_t>.stride)
-            vm_deallocate(mach_task_self_, vm_address_t(UInt(bitPattern: info)), size)
-        }
 
         var ticks: [CPUTicks] = []
         ticks.reserveCapacity(Int(numCPU))
@@ -44,6 +48,7 @@ public enum MemorySnapshotReader {
         var stats = vm_statistics64()
         var count = mach_msg_type_number_t(MemoryLayout<vm_statistics64>.stride / MemoryLayout<integer_t>.stride)
         let host = mach_host_self()
+        defer { mach_port_deallocate(mach_task_self_, host) } // B1：send right 配对释放
         let result = withUnsafeMutablePointer(to: &stats) { ptr -> kern_return_t in
             ptr.withMemoryRebound(to: integer_t.self, capacity: Int(count)) { rebound in
                 host_statistics64(host, HOST_VM_INFO64, rebound, &count)
