@@ -96,12 +96,16 @@ public final class PowerController: @unchecked Sendable {
         var status: Int32 = 0
         kill(pid, SIGTERM)
         for _ in 0 ..< reapPollAttempts {
-            if waitpid(pid, &status, WNOHANG) != 0 { return } // 已退出并收尸
+            let wp = waitpid(pid, &status, WNOHANG)
+            if wp > 0 { return } // 子进程已退出并被本调用方回收
+            if wp == -1, errno == ECHILD { return } // 子进程已被别处（如 init）回收，无需再管
             usleep(reapPollIntervalUs)
         }
-        // 仍存活（SIGTERM 被忽略，病态情况）→ 强杀并阻塞收尸。
-        kill(pid, SIGKILL)
-        waitpid(pid, &status, 0)
+        // 超时：尝试强杀；仅在进程确认存在时才发 SIGKILL，避免向不存在 PID 发信号。
+        if waitpid(pid, nil, WNOHANG) == 0 {
+            kill(pid, SIGKILL)
+            waitpid(pid, &status, 0)
+        }
     }
 
     deinit {
